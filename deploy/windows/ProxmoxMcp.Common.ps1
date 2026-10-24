@@ -396,8 +396,8 @@ function New-PmcStagingDir {
 
 function Get-PmcLockPythonVersion {
     # The lock header names the interpreter the hashes were computed for, e.g.
-    #   "# Broker runtime lock: CPython 3.12 on win_amd64 ..."
-    # Returns "3.12". The installer refuses any other major.minor: a wheel built for
+    #   "# Broker runtime lock: CPython 3.14 on win_amd64 ..."
+    # Returns "3.14". The installer refuses any other major.minor: a wheel built for
     # another ABI is either refused by pip or, worse, missing a hash for that ABI.
     param([Parameter(Mandatory)][string]$LockPath)
     $head = @(Get-Content -LiteralPath $LockPath -TotalCount 10)

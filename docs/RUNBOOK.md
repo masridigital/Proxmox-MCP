@@ -32,10 +32,8 @@ Do the steps in this order. Get a change approval first (SOC 2 CC8.1). Record th
    ```
 3. Python version. The first comment lines of `broker-win.txt` name the interpreter the hashes
    are for ("CPython X.Y"). The installer refuses any other major.minor. Use the newest
-   python.org Windows installer of that X.Y. Today the lock says 3.12, and 3.12.10 is the last
-   3.12 Windows installer (3.12 gets source-only security fixes since then). That is open risk
-   T23 in docs/SECURITY.md: regenerate the lock for a CPython line that still ships Windows
-   security builds before go-live (COMPLIANCE gate G10).
+   python.org Windows installer of that X.Y. The lock says CPython 3.14: use the newest
+   3.14.x Windows installer and pin its SHA-256 (docs/SECURITY.md T23).
 4. Download and record SHA-256 values for: the python.org installer, the cloudflared MSI
    (2025.7.0 or later), and WinSW v2.12.0 `WinSW.NET461.exe`. Confirm each hash from a second
    network. The installers copy each file into an Administrators-only staging folder and check

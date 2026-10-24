@@ -170,7 +170,7 @@ rotate a token, and stop the service in an emergency.
 You can run the upstream stdio server on a workstation, against a lab cluster:
 
 ```sh
-uv venv -p 3.12 .venv
+uv venv -p 3.14 .venv
 uv pip install -p .venv -e . pytest pytest-asyncio ruff
 export PROXMOX_HOST=pve.example.internal
 export PROXMOX_TLS_FINGERPRINT=<sha256-of-the-proxmox-certificate>

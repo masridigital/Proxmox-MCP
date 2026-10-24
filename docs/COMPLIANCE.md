@@ -55,7 +55,7 @@ Y yearly, E on event (hire, change, incident, termination).
 | G7 | Audit HMAC key escrowed by two custodians (section 7). | KCA, KCB | `evidence\key-escrow\escrow-<kid>-*.json`, signed escrow log |
 | G8 | Workforce training done for every enrolled user and every administrator (6.1). | HR, SO | Training records |
 | G9 | Incident response plan and contingency plan approved (6.5, 6.6). | SO | Signed plans |
-| G10 | The Python runtime decision is closed: the lock targets a CPython line with current Windows security builds (docs/SECURITY.md T23). | SYS | Change ticket for the lock regeneration |
+| G10 | The Python runtime decision is closed: the lock targets a CPython line with current Windows security builds (docs/SECURITY.md T23). | SYS | Met 2026-10-24: lock targets CPython 3.14 (commit history of requirements/broker-win.txt) |
 
 Until G1 and G2 are true, the build may run only against Proxmox guests that hold no PHI, and
 nobody may put PHI in guest names, notes, descriptions or tags.

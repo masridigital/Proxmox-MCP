@@ -31,7 +31,7 @@ controls.
 Secrets are not handled here. Use Protect-BrokerCredential.ps1.
 
 .EXAMPLE
-.\Install-ProxmoxMcpBroker.ps1 -PythonInstaller .\python-3.12.10-amd64.exe -PythonSha256 <hex> `
+.\Install-ProxmoxMcpBroker.ps1 -PythonInstaller .\python-3.14.x-amd64.exe -PythonSha256 <hex> `
   -WheelPath .\proxmox_mcp_server-<v>-py3-none-any.whl -WheelSha256 <hex> `
   -RequirementsLock .\broker-win.txt -RequirementsLockSha256 <hex> -WinSWPath .\WinSW.NET461.exe `
   -ProxmoxHost <proxmox-host> -ProxmoxTlsFingerprint <sha256 hex> -BrokerMode vpc -WhatIf
