@@ -1,23 +1,27 @@
 # Code owners (SOC 2 CC8.1). With branch protection "Require review from Code Owners", every
 # change below needs an approving review from the security team. The last matching pattern
 # wins, so the default rule comes first and the stricter paths after it.
+#
+# TEMPLATE: replace @YOUR-ORG/security with your own GitHub team (write access to this repo),
+# then remove the leading "# " from each rule. GitHub ignores commented lines, so the file is
+# inert until you do. Keep organization names out of upstream contributions.
 
-*                           @masridigital/security
+# *                           @YOUR-ORG/security
 
 # Change-management and supply-chain controls.
-/.github/                   @masridigital/security
-/pyproject.toml             @masridigital/security
-/uv.lock                    @masridigital/security
-/requirements/              @masridigital/security
+# /.github/                   @YOUR-ORG/security
+# /pyproject.toml             @YOUR-ORG/security
+# /uv.lock                    @YOUR-ORG/security
+# /requirements/              @YOUR-ORG/security
 
 # Trust boundary: identity, authorization, credentials, audit, PHI filtering.
-/proxmox_mcp/transport/     @masridigital/security
-/proxmox_mcp/credentials.py @masridigital/security
-/proxmox_mcp/enrollment.py  @masridigital/security
-/proxmox_mcp/identity.py    @masridigital/security
-/proxmox_mcp/policy.py      @masridigital/security
-/proxmox_mcp/audit.py       @masridigital/security
-/proxmox_mcp/phi.py         @masridigital/security
-/proxmox_mcp/output.py      @masridigital/security
-/worker/                    @masridigital/security
-/deploy/                    @masridigital/security
+# /proxmox_mcp/transport/     @YOUR-ORG/security
+# /proxmox_mcp/credentials.py @YOUR-ORG/security
+# /proxmox_mcp/enrollment.py  @YOUR-ORG/security
+# /proxmox_mcp/identity.py    @YOUR-ORG/security
+# /proxmox_mcp/policy.py      @YOUR-ORG/security
+# /proxmox_mcp/audit.py       @YOUR-ORG/security
+# /proxmox_mcp/phi.py         @YOUR-ORG/security
+# /proxmox_mcp/output.py      @YOUR-ORG/security
+# /worker/                    @YOUR-ORG/security
+# /deploy/                    @YOUR-ORG/security

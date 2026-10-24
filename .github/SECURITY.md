@@ -7,7 +7,7 @@ on this repository's Security tab (private vulnerability reporting). Do not open
 pull request, or discussion for a security problem, and do not include real hostnames, tokens,
 or patient data in a report.
 
-Reports are triaged by the `@masridigital/security` team. Expect an acknowledgement within
+Reports are triaged by the repository's security team (the code owners in `.github/CODEOWNERS`). Expect an acknowledgement within
 2 business days and a triage decision (severity, affected versions, plan) within 5 business days.
 
 ## Supported versions
