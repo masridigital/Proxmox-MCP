@@ -23,6 +23,7 @@ Checked per case:
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -96,7 +97,10 @@ def test_tool_matrix(b, tool, mode):
         return
 
     assert body["ok"] is True, f"{tool} as {mode}: {text}"
-    assert text.startswith(UNTRUSTED_LABEL) and OPEN_TAG in text
+    nonce = re.search(r"</untrusted-data-([0-9a-f]{32})>\Z", text)
+    assert nonce, "result must end with the nonce close tag"
+    n = nonce.group(1)
+    assert text.startswith(UNTRUSTED_LABEL.format(nonce=n)) and OPEN_TAG.format(nonce=n) in text
     assert seen, f"{tool} made no Proxmox call"
     assert {s.authorization for s in seen} == {user.authorization}
 
