@@ -37,10 +37,12 @@ dependencies = [
     "mcp>=1.30.0,<2",
     "httpx>=0.28.1",
     "python-dotenv>=1.2.4",
+    # Floors sit above known advisories: pyjwt 2.10.1 (CVE-2024-53861), starlette 0.49.1
+    # (CVE-2025-54121, CVE-2025-62727). The exact, hashed versions live in uv.lock.
     # Cloudflare Access JWT validation (RS256 against the team JWKS).
-    "pyjwt[crypto]>=2.9,<3",
+    "pyjwt[crypto]>=2.10.1,<3",
     # Streamable HTTP transport (both already pulled in by mcp; pinned here because we import them).
-    "starlette>=0.40",
+    "starlette>=0.49.1",
     "uvicorn>=0.30",
 ]
 
@@ -58,31 +60,45 @@ proxmox-mcp-audit-verify = "proxmox_mcp.audit:main"
 proxmox-mcp-protect-credential = "proxmox_mcp.credentials:protect_main"
 
 [build-system]
-requires = ["hatchling"]
+# Pinned so the wheel build is reproducible; CI builds without isolation from the hashed
+# toolchain in requirements/ci-tools.txt, which pins the same version.
+requires = ["hatchling==1.32.4"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["proxmox_mcp"]
 
-[tool.uv]
-dev-dependencies = [
-    "pytest>=8.0.0",
-    "pytest-asyncio>=0.23.0",
-    "pytest-cov>=4.1.0",
-    "black>=24.0.0",
-    "ruff>=0.3.0",
-    "mypy>=1.9.0",
+# Dev tooling. Exact pins: the formatter's output and the linter's rule set change between
+# releases, so a floating ruff turns CI red on an unrelated PR. Dependabot bumps these as a
+# group (.github/dependabot.yml). black and mypy were removed: neither ran in CI and ruff
+# covers formatting. Security tools (pip-audit, cyclonedx-bom) are pinned in
+# requirements/ci-tools.txt with hashes instead, so they never enter the broker's lock.
+[dependency-groups]
+dev = [
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
+    "pytest-cov==7.1.0",
+    "ruff==0.17.1",
 ]
 
-[tool.black]
-line-length = 100
-target-version = ["py310", "py311", "py312"]
-include = '\.pyi?$'
-
+[tool.uv]
+# Supply-chain cooldown: resolve only artifacts uploaded at least 7 days ago, so a hijacked
+# release is usually yanked before it can reach the lock. For an urgent security fix, add a
+# per-package override: exclude-newer-package = { "<pkg>" = "<RFC 3339 timestamp>" }.
+exclude-newer = "7 days"
+# certifi: PYSEC-2026-4320 is fixed in 2026.10.19 (uploaded 2026-10-20), inside the cooldown.
+# A fixed cutoff also freezes certifi there: remove this override after 2026-10-27, when the
+# fix is older than the cooldown window, so certifi updates resume.
+exclude-newer-package = { certifi = "2026-10-21T00:00:00Z" }
+# Floor for the same advisory, so a later re-lock cannot fall back below the fix.
+constraint-dependencies = ["certifi>=2026.10.19"]
 
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+extend-exclude = [".venv", "htmlcov", "worker"]
+
+[tool.ruff.lint]
 select = [
     "E",  # pycodestyle errors
     "W",  # pycodestyle warnings
@@ -91,23 +107,71 @@ select = [
     "B",  # flake8-bugbear
     "C4", # flake8-comprehensions
     "UP", # pyupgrade
+    "S",  # flake8-bandit: security lint (CC7.1). Every ignore below carries its justification.
 ]
 ignore = [
-    "E501", # line too long (handled by black)
+    "E501", # line too long (the formatter owns line length)
     "B008", # do not perform function calls in argument defaults
 ]
 
-[tool.mypy]
-python_version = "3.10"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = false
-disallow_incomplete_defs = false
-check_untyped_defs = true
-no_implicit_optional = true
-warn_redundant_casts = true
-warn_unused_ignores = true
-warn_no_return = true
+[tool.ruff.lint.per-file-ignores]
+# S105: `token_type != "app"` compares the Access JWT "type" claim to the literal "app";
+# it is not a credential. Remove once that line carries an inline `# noqa: S105`.
+"proxmox_mcp/transport/access_jwt.py" = ["S105"]
+# C416 `{k: v for k, v in args.items()}` -> `dict(args)`: a behaviour-identical shallow copy in
+# the upstream tool handlers. Ignored only because the CI change could not edit
+# proxmox_mcp/**; drop this entry once the handlers are fixed.
+"proxmox_mcp/tools/*.py" = ["C416"]
+# Tests: S101 pytest asserts; S104/S105/S106 fixed fake hosts, secrets and passwords used as
+# test inputs; S110 deliberate swallow while asserting a side effect; S603 subprocess runs
+# sys.executable with a fixed argv.
+"tests/**" = ["S101", "S104", "S105", "S106", "S110", "S603"]
+
+[tool.ruff.format]
+# Files that predate the formatter gate. Reformatting them in the CI change would collide with
+# concurrent edits to the same files; run `ruff format` once after those land and delete this
+# list. Every new file is checked.
+exclude = [
+    "README.md",
+    "proxmox_mcp/audit.py",
+    "proxmox_mcp/client.py",
+    "proxmox_mcp/credentials.py",
+    "proxmox_mcp/outbound.py",
+    "proxmox_mcp/output.py",
+    "proxmox_mcp/phi.py",
+    "proxmox_mcp/router.py",
+    "proxmox_mcp/tools/access.py",
+    "proxmox_mcp/tools/acme.py",
+    "proxmox_mcp/tools/appliances.py",
+    "proxmox_mcp/tools/cluster.py",
+    "proxmox_mcp/tools/disks.py",
+    "proxmox_mcp/tools/firewall.py",
+    "proxmox_mcp/tools/lxc.py",
+    "proxmox_mcp/tools/nodes.py",
+    "proxmox_mcp/tools/notifications.py",
+    "proxmox_mcp/tools/qemu.py",
+    "proxmox_mcp/tools/sdn.py",
+    "proxmox_mcp/tools/storage.py",
+    "tests/test_audit.py",
+    "tests/test_client_auth.py",
+    "tests/test_client_tls.py",
+    "tests/test_cloud_vms.py",
+    "tests/test_fortigate_deploy.py",
+    "tests/test_outbound.py",
+    "tests/test_output.py",
+    "tests/test_phi.py",
+    "tests/test_policy.py",
+    "tests/test_router.py",
+]
+
+[tool.coverage.run]
+source = ["proxmox_mcp"]
+
+[tool.coverage.report]
+# Measured 91.85% line coverage at 4bf8310 (445 tests), rounded down. CI fails below this.
+# Raise it as coverage grows; never lower it.
+fail_under = 91
+show_missing = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

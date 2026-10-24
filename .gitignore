@@ -248,6 +248,17 @@ $RECYCLE.BIN/
 *.pfx
 secrets/
 credentials/
+# Broker credential material (DPAPI blobs, enrollment, Worker identity keys)
+*.dpapi
+enrollment.json
+*.jwk
+# Cloudflare Worker local secrets and state
+.dev.vars
+.dev.vars.*
+.wrangler/
+# Build evidence is produced by CI, never committed
+*.cdx.json
+SHA256SUMS
 
 # Logs
 logs/
@@ -314,9 +325,9 @@ site/
 # ========================================
 # Other
 # ========================================
-# Node (if ever needed)
+# Node (worker/). package-lock.json is deliberately NOT ignored: `npm ci` and Dependabot need
+# the committed lockfile for a reproducible, integrity-checked Worker build.
 node_modules/
-package-lock.json
 yarn.lock
 
 # Backup files
