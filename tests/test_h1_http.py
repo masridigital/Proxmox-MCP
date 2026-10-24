@@ -436,7 +436,7 @@ def test_uvicorn_settings(monkeypatch, env):  # noqa: F811
     )
     from proxmox_mcp import server
 
-    monkeypatch.setattr(server, "_validate_config", lambda: None)
+    monkeypatch.setattr(server, "_validate_config", lambda role="stdio": None)
     http_app.main()
     # Pin the pure-Python h11 parser: strict framing (rejects CL+TE, bad
     # Content-Length), and h11_max_incomplete_event_size actually applies. With

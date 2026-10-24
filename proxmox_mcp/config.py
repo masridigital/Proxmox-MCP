@@ -130,6 +130,8 @@ KNOWN_VARS: dict[str, str] = {
     "MCP_ALLOWED_HOSTS": "comma-separated Host header allowlist (default loopback names)",
     "MCP_MAX_REQUEST_BYTES": "request body cap, 1 KiB-4 MiB (default 256 KiB)",
     "MCP_REQUEST_TIMEOUT": "per-request timeout in seconds, 5-900 (default 120)",
+    "MCP_BODY_TIMEOUT": "seconds for a request body to arrive, 1-300 (default 15)",
+    "MCP_HEADER_TIMEOUT": "seconds for a request head to arrive, 1-120 (default 10)",
     "MCP_MAX_CONCURRENCY": "concurrent requests, 1-4096 (default 64)",
     "BROKER_REQUIRE_ACCESS_JWT": "0 disables the Access service-token check (Workers VPC mode)",
     "BROKER_ALLOWED_SERVICE_CLIENT_IDS": "comma-separated Access service token client ids",
@@ -284,6 +286,8 @@ class Settings:
     allowed_hosts: tuple[str, ...] = ()
     max_request_bytes: int = 256 * 1024
     request_timeout: int = 120
+    body_timeout: int = 15
+    header_timeout: int = 10
     max_concurrency: int = 64
     require_access_jwt: bool = True
     allowed_service_client_ids: tuple[str, ...] = ()
@@ -624,6 +628,8 @@ def load(environ: Mapping[str, str] | None = None, *, role: str = "broker") -> S
         allowed_hosts=hosts,
         max_request_bytes=r.integer("MCP_MAX_REQUEST_BYTES", 256 * 1024, 1024, 4 * 1024**2),
         request_timeout=r.integer("MCP_REQUEST_TIMEOUT", 120, 5, 900),
+        body_timeout=r.integer("MCP_BODY_TIMEOUT", 15, 1, 300),
+        header_timeout=r.integer("MCP_HEADER_TIMEOUT", 10, 1, 120),
         max_concurrency=r.integer("MCP_MAX_CONCURRENCY", 64, 1, 4096),
         require_access_jwt=require_jwt,
         allowed_service_client_ids=client_ids,

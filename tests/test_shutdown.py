@@ -29,7 +29,7 @@ async def fake_app_run(*args, **kwargs):
 def test_client_closed_in_same_event_loop(monkeypatch):
     fake = FakeClient()
     monkeypatch.setattr(server, "proxmox", fake)
-    monkeypatch.setattr(server, "_validate_config", lambda: None)
+    monkeypatch.setattr(server, "_validate_config", lambda role="stdio": None)
     monkeypatch.setattr(server.mcp.server.stdio, "stdio_server", fake_stdio_server)
     monkeypatch.setattr(server.app, "run", fake_app_run)
 

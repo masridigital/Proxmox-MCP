@@ -422,6 +422,9 @@ async def test_tls_failures_log_no_secret(monkeypatch, certs, caplog):
     root = logging.getLogger()
     old = root.level
     root.setLevel(logging.DEBUG)
+    # Another test may have run http_app.main(), which quiets these loggers process-wide.
+    for name in ("httpx", "httpcore"):
+        monkeypatch.setattr(logging.getLogger(name), "level", logging.DEBUG)
     try:
         with caplog.at_level(logging.DEBUG):
             async with tls_server(certs.evil) as srv:
