@@ -41,7 +41,7 @@ dependencies = [
     "pyjwt[crypto]>=2.9,<3",
     # Streamable HTTP transport (both already pulled in by mcp; pinned here because we import them).
     "starlette>=0.40",
-    "uvicorn>=0.30",
+    "uvicorn>=0.54.0",
 ]
 
 [project.urls]
