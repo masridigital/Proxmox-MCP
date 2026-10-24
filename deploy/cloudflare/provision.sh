@@ -74,8 +74,6 @@ readonly CLAUDE_CALLBACKS='["https://claude.ai/api/mcp/auth_callback","https://c
 readonly BROKER_SCRIPTS='C:\Program Files\ProxmoxMCP\scripts'
 # Windows PowerShell 5.1 is in the box on every Windows Server; the scripts support 5.1 and 7.
 BROKER_PS="${BROKER_PS:-powershell.exe -NoProfile -NonInteractive}"
-[[ "$BROKER_PS" =~ ^(powershell\.exe|pwsh)(\ -[A-Za-z]+)*$ ]] || die "BROKER_PS must be powershell.exe or pwsh with switches only"
-[[ -z "$BROKER_SSH" || "$BROKER_SSH" =~ ^[A-Za-z0-9._-]+@[A-Za-z0-9.-]+$ ]] || die "BROKER_SSH must be user@host"
 
 log() { printf '==> %s\n' "$*" >&2; }
 warn() { printf 'WARN: %s\n' "$*" >&2; }
@@ -84,6 +82,8 @@ want() { [[ "$STEPS" == "all" || " $STEPS " == *" $1 "* ]]; }
 want_explicit() { [[ " $STEPS " == *" $1 "* ]]; }
 
 need() { [[ -n "${!1:-}" ]] || die "set $1"; }
+[[ "$BROKER_PS" =~ ^(powershell\.exe|pwsh)(\ -[A-Za-z]+)*$ ]] || die "BROKER_PS must be powershell.exe or pwsh with switches only"
+[[ -z "$BROKER_SSH" || "$BROKER_SSH" =~ ^[A-Za-z0-9._-]+@[A-Za-z0-9.-]+$ ]] || die "BROKER_SSH must be user@host"
 for t in curl jq openssl; do command -v "$t" >/dev/null 2>&1 || die "$t is required"; done
 
 for v in ACCOUNT_ID ZONE_ID WORKER_HOSTNAME TEAM_DOMAIN IDP_ID ALLOWED_EMAILS PORTAL_ID SERVER_ID WORKER_DIR AUDIT_BUCKET; do need "$v"; done
