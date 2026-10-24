@@ -3,10 +3,13 @@
 Defense in depth behind the inbound tool policy. Even if a tool handler builds a
 path from attacker-influenced arguments, the request leaves only when:
 
-1. the path is well formed (``validate_path``): starts with "/", no "..", "//",
-   "?", "#", "\\", whitespace or control characters, and "%" only as one of the
-   escapes the tools use for slash-bearing values (%2F, %3A, %40, %2C, %3D, %2B);
-2. no global deny rule matches (sensitive areas, regardless of mode);
+1. the path is well formed (``validate_path``): ASCII from a fixed charset
+   ([A-Za-z0-9._:@!+=,/%-]), starts with "/", no "..", "//", "?", "#", "\\",
+   ";", whitespace or control characters, and "%" only as one of the escapes the
+   tools use for slash-bearing values (%2F, %3A, %40, %2C, %3D, %2B), whose
+   decoded form must not produce "." / ".." / empty segments;
+2. no global deny rule matches (sensitive areas, regardless of mode), judged on
+   the raw and on the percent-decoded path;
 3. the method is allowed for the mode: ro = GET; operator = GET plus a short list
    of day-two operations; rw = everything in the allowlist (DELETE only for rw);
 4. the path matches an allowlisted template for that method, segment by segment,
@@ -43,7 +46,7 @@ def safe_segment(value: object) -> str:
     if isinstance(value, bool) or not isinstance(value, (str, int)):
         raise ValueError("invalid path parameter type")
     text = str(value)
-    if not SAFE_SEGMENT_RE.match(text) or text in (".", "..") or ".." in text:
+    if not SAFE_SEGMENT_RE.fullmatch(text) or text in (".", "..") or ".." in text:
         raise ValueError("invalid path parameter")
     return text
 
@@ -73,6 +76,10 @@ _DEFAULT_PLACEHOLDER = _SEG
 
 _ALLOWED_ESCAPES = re.compile(r"%(?:2[FfCcBb]|3[AaDd]|40)")
 _BAD_CHARS = re.compile(r"[\x00-\x20\x7f-\x9f?#\\\s]")
+# Positive charset: every character any tool puts in a path (UPIDs use ":@!",
+# encoded volume ids "%", userids "+"). Anything else (";", "$", "~", "*", ...)
+# is refused before a deny or allow decision is attempted.
+_PATH_CHARS = re.compile(r"[A-Za-z0-9._:@!+=,/%-]+")
 
 
 def validate_path(path: object) -> str:
@@ -80,6 +87,8 @@ def validate_path(path: object) -> str:
     if not isinstance(path, str) or not path.startswith("/") or len(path) > 2048:
         raise PermissionError("blocked by outbound policy: invalid path")
     if not path.isascii() or _BAD_CHARS.search(path) or "//" in path or ".." in path:
+        raise PermissionError("blocked by outbound policy: invalid path")
+    if not _PATH_CHARS.fullmatch(path):
         raise PermissionError("blocked by outbound policy: invalid path")
     if path != "/" and path.endswith("/"):
         raise PermissionError("blocked by outbound policy: invalid path")
@@ -397,7 +406,8 @@ def _compile(template: str) -> re.Pattern[str]:
             parts.append(PLACEHOLDER_TYPES.get(m.group(1), _DEFAULT_PLACEHOLDER))
         else:
             parts.append(re.escape(seg))
-    return re.compile("^/" + "/".join(parts) + "$") if parts else re.compile("^/$")
+    # \Z, not $: "$" also matches before a trailing newline.
+    return re.compile("^/" + "/".join(parts) + r"\Z") if parts else re.compile(r"^/\Z")
 
 
 def _index(entries: Iterable[tuple[str, str]]) -> dict[str, list[re.Pattern[str]]]:
@@ -418,18 +428,24 @@ def _blocked(reason: str) -> PermissionError:
 
 
 def deny_reason(method: str, path: str) -> str | None:
-    """The global deny rule a request hits, if any (path must already be valid)."""
+    """The global deny rule a request hits, if any (path must already be valid).
+
+    Judged on the raw path AND on its percent-decoded form: an allowed escape
+    such as %2F inside a volume id must not hide a denied endpoint from a server
+    that decodes before routing.
+    """
+    decoded = unquote(path)
     for methods, pattern, reason in _DENY:
-        if method in methods and pattern.search(path):
+        if method in methods and (pattern.search(path) or pattern.search(decoded)):
             return reason
     return None
 
 
 def check(method: str, path: str, mode: Mode) -> None:
     """Raise PermissionError("blocked by outbound policy: ...") unless allowed."""
-    if method not in METHODS:
+    if not isinstance(method, str) or method not in METHODS:
         raise _blocked("method not allowed")
-    if mode not in MODES:
+    if not isinstance(mode, str) or mode not in MODES:
         raise _blocked("unknown mode")
     validate_path(path)
     reason = deny_reason(method, path)
