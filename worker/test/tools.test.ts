@@ -21,6 +21,9 @@ import {
 
 let issuer: Issuer;
 let token: string;
+// Test-only, format-shaped service token values (not real credentials).
+const CLIENT_ID = "0123456789abcdef0123456789abcdef.access";
+const CLIENT_SECRET = "f".repeat(64);
 
 beforeEach(async () => {
   resetJwksCache();
@@ -58,9 +61,8 @@ describe("list_tools", () => {
   it(`caps results at ${LIST_CAP}`, async () => {
     const many = Array.from({ length: 80 }, (_, i) => ({ name: `get_thing_${i}`, description: "thing", inputSchema: { type: "object" }, tier: "read" }));
     const r = await tool("list_tools", { search_terms: ["thing"] }, defaultBroker([], many));
-    const doc = JSON.parse(r.content[0]!.text);
-    expect(doc.tools).toHaveLength(LIST_CAP);
-    expect(doc.note).toContain("80 tools match");
+    expect(JSON.parse(r.content[0]!.text)).toHaveLength(LIST_CAP);
+    expect(r.content[1]!.text).toContain("80 tools match");
   });
 
   it("validates input strictly", async () => {
@@ -130,7 +132,7 @@ describe("execute_tool", () => {
     expect(exec.headers.get("origin")).toBeNull();
     expect(exec.headers.get("cf-access-client-id")).toBeNull(); // vpc mode
     expect(r.content[0]!.text).toMatch(/^UNTRUSTED DATA from the Proxmox API \(tool get_vm_status\)/);
-    expect(r.content[0]!.text).toContain('"status":"running"');
+    expect(r.content[0]!.text).toContain('"status": "running"');
   });
 
   it("defaults missing arguments to {}", async () => {
@@ -238,15 +240,15 @@ describe("execute_tool", () => {
     const calls: BrokerCall[] = [];
     installFetch(issuer, defaultBroker(calls));
     const env = makeEnv({
-      overrides: { BROKER_MODE: "access", BROKER_URL: BROKER_URL_ACCESS, BROKER: undefined, BROKER_ACCESS_CLIENT_ID: "cid.access", BROKER_ACCESS_CLIENT_SECRET: "csecret" },
+      overrides: { BROKER_MODE: "access", BROKER_URL: BROKER_URL_ACCESS, BROKER: undefined, BROKER_ACCESS_CLIENT_ID: CLIENT_ID, BROKER_ACCESS_CLIENT_SECRET: CLIENT_SECRET },
     });
     const res = await handle(mcpRequest(callTool("execute_tool", { name: "list_vms", arguments: {} }), { token }), env, ctx);
     const body = (await res.json()) as { result: { isError: boolean } };
     expect(body.result.isError).toBe(false);
     const exec = calls.find((c) => c.path === "/v1/execute")!;
-    expect(exec.headers.get("cf-access-client-id")).toBe("cid.access");
-    expect(exec.headers.get("cf-access-client-secret")).toBe("csecret");
-    expect(JSON.stringify(body)).not.toContain("csecret");
+    expect(exec.headers.get("cf-access-client-id")).toBe(CLIENT_ID);
+    expect(exec.headers.get("cf-access-client-secret")).toBe(CLIENT_SECRET);
+    expect(JSON.stringify(body)).not.toContain(CLIENT_SECRET);
   });
 
   it("broker unreachable -> short error", async () => {

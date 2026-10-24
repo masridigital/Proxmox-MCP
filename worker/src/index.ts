@@ -8,15 +8,19 @@
 
 import { AuthError, emailAllowed, verifyAccessJwt } from "./access-jwt";
 import { audit, type AuditRecord, WORKER_VERSION } from "./audit";
+import { importSigningKey } from "./assertion";
 import { ConfigError, type Config, type Env, loadConfig } from "./config";
+import { JsonError, parseStrictJson } from "./json-strict";
 import {
   RpcError,
   type RpcId,
   type RpcMessage,
   INVALID_PARAMS,
+  INVALID_REQUEST,
   PARSE_ERROR,
   SERVER_ERROR,
   SUPPORTED_VERSIONS,
+  auditMethodName,
   checkMethod,
   negotiate,
   parseMessage,
@@ -29,6 +33,18 @@ export { AuditChain } from "./audit";
 export { DailyQuota } from "./quota";
 
 export const MAX_REQUEST_BYTES = 256 * 1024;
+/** Request JSON nesting limit: MCP envelopes need ~6 levels, Proxmox arguments are flat. */
+export const MAX_REQUEST_DEPTH = 32;
+const RAY_RE = /^[A-Za-z0-9-]{1,64}$/;
+
+/** "application/json" with no parameter other than charset=utf-8. */
+function isJsonContentType(value: string | null): boolean {
+  if (value === null) return false;
+  const [type, ...params] = value.split(";").map((p) => p.trim().toLowerCase());
+  if (type !== "application/json") return false;
+  return params.every((p) => p === "" || /^charset\s*=\s*(?:utf-8|"utf-8")$/.test(p));
+}
+
 const SERVER_INFO = { name: "proxmox-mcp", version: WORKER_VERSION };
 const INSTRUCTIONS =
   "Proxmox VE tools. Call list_tools with 1 to 3 specific terms, then describe_tool_input for the " +
@@ -76,7 +92,7 @@ function withEra(msg: RpcMessage, result: Record<string, unknown>): Record<strin
 export async function handle(request: Request, env: Env, ctx: ExecutionContextLike): Promise<Response> {
   const started = Date.now();
   const rawRay = request.headers.get("cf-ray") ?? "";
-  const ray = /^[A-Za-z0-9-]{1,64}$/.test(rawRay) ? rawRay : "";
+  const ray = RAY_RE.test(rawRay) ? rawRay : "";
   const record: AuditRecord = { event: "request", ray };
   const finish = (res: Response, extra: Partial<AuditRecord> = {}): Response => {
     audit(env, { ...record, ...extra, status: res.status, ms: Date.now() - started }, (p) => ctx.waitUntil(p));
@@ -93,6 +109,13 @@ export async function handle(request: Request, env: Env, ctx: ExecutionContextLi
   } catch (e) {
     const name = e instanceof ConfigError ? e.message : "unknown";
     return finish(respond(503, { error: "unavailable" }), { event: "config_error", deny: name });
+  }
+  // The signing key must import as an Ed25519 PKCS8 private key (cached per isolate). A bad
+  // secret is a deploy error: 503 for everyone, not a per-call "internal error".
+  try {
+    await importSigningKey(env.IDENTITY_SIGNING_KEY);
+  } catch {
+    return finish(respond(503, { error: "unavailable" }), { event: "config_error", deny: "IDENTITY_SIGNING_KEY" });
   }
 
   const host = (request.headers.get("host") ?? url.host).toLowerCase().replace(/:443$/, "");
@@ -129,8 +152,7 @@ export async function handle(request: Request, env: Env, ctx: ExecutionContextLi
   }
 
   // Body.
-  const ctype = (request.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
-  if (ctype !== "application/json") return deny(respond(415, { error: "unsupported media type" }), "content_type");
+  if (!isJsonContentType(request.headers.get("content-type"))) return deny(respond(415, { error: "unsupported media type" }), "content_type");
   const declared = request.headers.get("content-length");
   if (declared !== null && !(Number(declared) <= MAX_REQUEST_BYTES)) return deny(respond(413, { error: "request too large" }), "size");
   const raw = await readCapped(request.body, MAX_REQUEST_BYTES);
@@ -138,15 +160,19 @@ export async function handle(request: Request, env: Env, ctx: ExecutionContextLi
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(decodeUtf8(raw));
-  } catch {
-    return deny(rpcError(null, new RpcError(PARSE_ERROR, "parse error", 400)), "parse");
+    parsed = parseStrictJson(decodeUtf8(raw), { maxDepth: MAX_REQUEST_DEPTH, forbidKeys: true });
+  } catch (e) {
+    if (e instanceof JsonError && e.kind === "forbidden-key") {
+      return deny(rpcError(null, new RpcError(INVALID_REQUEST, "forbidden property name", 400)), "forbidden_key");
+    }
+    const kind = e instanceof JsonError ? e.kind : "utf8";
+    return deny(rpcError(null, new RpcError(PARSE_ERROR, "parse error", 400)), `parse:${kind}`);
   }
 
   let msg: RpcMessage;
   try {
     const base = parseMessage(parsed);
-    record.rpc = base.method;
+    record.rpc = auditMethodName(base.method);
     msg = negotiate(base, request.headers);
     if (msg.isNotification) return finish(respond(202, null));
     checkMethod(msg);
@@ -204,7 +230,8 @@ export default {
     try {
       return await handle(request, env, ctx);
     } catch {
-      console.log(JSON.stringify({ ts: new Date().toISOString(), event: "internal_error", ray: request.headers.get("cf-ray") ?? "" }));
+      const ray = request.headers.get("cf-ray") ?? "";
+      console.log(JSON.stringify({ ts: new Date().toISOString(), event: "internal_error", ray: RAY_RE.test(ray) ? ray : "" }));
       return respond(500, { error: "internal error" });
     }
   },

@@ -96,6 +96,9 @@ export async function verifyIdentity(jws: string, body: Uint8Array, method: stri
   if (!ok) throw new Error("signature");
   const claims = JSON.parse(new TextDecoder().decode(b64urlDecode(p!))) as Record<string, unknown>;
   if (claims.iss !== "proxmox-mcp-worker" || claims.aud !== "proxmox-broker") throw new Error("iss/aud");
+  // proxmox_mcp/transport/identity_assertion.py _EMAIL_RE and _JTI_RE
+  if (typeof claims.sub !== "string" || !/^[a-z0-9._%+-]{1,64}@[a-z0-9-]{1,63}(\.[a-z0-9-]{1,63})+$/.test(claims.sub)) throw new Error("sub");
+  if (typeof claims.jti !== "string" || !/^[A-Za-z0-9-]{8,128}$/.test(claims.jti)) throw new Error("jti");
   if ((claims.exp as number) - (claims.iat as number) !== 60) throw new Error("lifetime");
   if (claims.req !== (await sha256Hex(body))) throw new Error("req");
   if (claims.method !== method || claims.path !== path) throw new Error("method/path");

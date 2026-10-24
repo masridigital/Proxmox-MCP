@@ -61,9 +61,12 @@ interface StateLike {
 }
 interface R2Like {
   put(key: string, value: string, options?: { httpMetadata?: { contentType?: string } }): Promise<unknown>;
+  head?(key: string): Promise<{ size: number } | null>;
 }
 
 export const FLUSH_INTERVAL_MS = 5 * 60_000;
+const RETRY_MS = 60_000;
+const FLUSH_BATCH = 1000;
 const FLUSH_AT = 500; // pending lines that trigger an early flush
 const MAX_LINE = 8192;
 const GENESIS = "0".repeat(64);
@@ -110,25 +113,66 @@ export class AuditChain {
 
   async alarm(): Promise<void> {
     const s = this.state.storage;
-    const lines = await s.list<string>({ prefix: "p:", limit: 1000 });
-    if (!lines.size) return;
     if (!this.env.AUDIT_BUCKET) {
-      await s.setAlarm(Date.now() + FLUSH_INTERVAL_MS);
+      if ((await s.list<string>({ prefix: "p:", limit: 1 })).size) await s.setAlarm(Date.now() + FLUSH_INTERVAL_MS);
+      return;
+    }
+    // A batch, once chosen, is pinned in storage until it is confirmed stored, so a retry
+    // writes exactly the same object (same name, same bytes) even if new lines arrived.
+    let batch = await s.get<{ first: string; last: string; count: number }>("batch");
+    const lines = await s.list<string>({ prefix: "p:", limit: batch?.count ?? FLUSH_BATCH });
+    if (!lines.size) {
+      if (batch) await s.delete(["batch"]);
       return;
     }
     const keys = [...lines.keys()];
-    const first = keys[0]!.slice(2);
-    const last = keys[keys.length - 1]!.slice(2);
-    const day = new Date().toISOString().slice(0, 10).replace(/-/g, "/");
-    await this.env.AUDIT_BUCKET.put(`worker-audit/${day}/${first}-${last}.jsonl`, `${[...lines.values()].join("\n")}\n`, {
-      httpMetadata: { contentType: "application/x-ndjson" },
-    });
-    await s.delete(keys);
+    if (!batch || keys[0] !== `p:${batch.first}` || keys[keys.length - 1] !== `p:${batch.last}`) {
+      batch = { first: keys[0]!.slice(2), last: keys[keys.length - 1]!.slice(2), count: keys.length };
+      await s.put({ batch });
+    }
+    const values = [...lines.values()];
+    // The object name depends only on the batch (first record's day + sequence range), not
+    // on the flush time. With bucket lock an overwrite is refused, so after "put succeeded,
+    // delete failed" a head() that finds the object with the same size proves the batch is
+    // stored and lets the chain move on instead of retrying forever.
+    const name = `worker-audit/${batchDay(values[0]!)}/${batch.first}-${batch.last}.jsonl`;
+    const body = `${values.join("\n")}\n`;
+    try {
+      await this.env.AUDIT_BUCKET.put(name, body, { httpMetadata: { contentType: "application/x-ndjson" } });
+    } catch {
+      let stored = false;
+      try {
+        const head = await this.env.AUDIT_BUCKET.head?.(name);
+        stored = !!head && head.size === new TextEncoder().encode(body).byteLength;
+      } catch {
+        stored = false;
+      }
+      if (!stored) {
+        // Keep the batch; the lines stay in DO storage until a write succeeds.
+        console.log(JSON.stringify({ event: "audit_flush_error", first: batch.first, last: batch.last }));
+        await s.setAlarm(Date.now() + RETRY_MS);
+        return;
+      }
+    }
+    // Durable Object storage deletes at most 128 keys per call.
+    for (let i = 0; i < keys.length; i += 128) await s.delete(keys.slice(i, i + 128));
+    await s.delete(["batch"]);
     const pending = (await s.get<number>("pending")) ?? 0;
     await s.put({ pending: Math.max(0, pending - keys.length) });
     const more = (await s.list<string>({ prefix: "p:", limit: 1 })).size > 0;
     await s.setAlarm(Date.now() + (more ? 1000 : FLUSH_INTERVAL_MS));
   }
+}
+
+/** UTC day of a stored line's `ts` as YYYY/MM/DD (deterministic per batch). */
+function batchDay(line: string): string {
+  try {
+    const ts = (JSON.parse(line) as { ts?: unknown }).ts;
+    if (typeof ts === "string" && /^\d{4}-\d{2}-\d{2}T/.test(ts)) return ts.slice(0, 10).replace(/-/g, "/");
+  } catch {
+    // fall through
+  }
+  return "undated";
 }
 
 /** Verify a chain of stored lines (as written to R2). Returns the number of breaks. */

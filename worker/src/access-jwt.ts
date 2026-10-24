@@ -12,7 +12,15 @@ const JWKS_TTL_MS = 10 * 60_000;
 const JWKS_MIN_REFRESH_MS = 30_000;
 const MAX_TOKEN_LEN = 8192;
 const MAX_JWKS_BYTES = 64 * 1024;
-const EMAIL_RE = /^[^\s@<>()",;:\\[\]]{1,64}@[a-z0-9.-]{1,253}$/;
+const JWKS_FAILURE_BACKOFF_MS = 5_000;
+// Same shape the broker requires for the assertion `sub` (identity_assertion._EMAIL_RE), so a
+// user the broker would refuse is refused here with a clear reason. ASCII is checked BEFORE
+// lowercasing: String.prototype.toLowerCase folds U+212A KELVIN SIGN to "k" and U+0130 to
+// "i\u0307", which would let an IdP-asserted "\u212Aelly@" act as "kelly@".
+const RAW_EMAIL_RE = /^[\x21-\x7e]{3,254}$/;
+const EMAIL_RE = /^[a-z0-9._%+-]{1,64}@[a-z0-9-]{1,63}(\.[a-z0-9-]{1,63})+$/;
+// JOSE header members that carry or point at key material. We only ever use our own JWKS.
+const FORBIDDEN_HEADERS = ["jku", "jwk", "x5u", "x5c", "x5t", "x5t#S256"];
 
 export class AuthError extends Error {
   constructor(
@@ -42,10 +50,37 @@ interface CachedKeys {
 }
 
 let cache: CachedKeys | null = null;
+// One fetch in flight per isolate (a cold-start burst shares it) and the time of the last
+// attempt, successful or not, so a failing or flooded endpoint is not hammered.
+let inflight: Promise<Map<string, CryptoKey>> | null = null;
+let lastAttempt = -Infinity;
+let lastFailure = -Infinity;
 
 /** Test hook: forget cached keys. */
 export function resetJwksCache(): void {
   cache = null;
+  inflight = null;
+  lastAttempt = -Infinity;
+  lastFailure = -Infinity;
+}
+
+function fetchKeysOnce(opts: AccessJwtOptions, now: number): Promise<Map<string, CryptoKey>> {
+  if (inflight) return inflight;
+  if (now - lastFailure < JWKS_FAILURE_BACKOFF_MS) return Promise.reject(new AuthError("jwks unavailable", 503));
+  lastAttempt = now;
+  const p = fetchKeys(opts, now).then(
+    (keys) => {
+      inflight = null;
+      return keys;
+    },
+    (e: unknown) => {
+      inflight = null;
+      lastFailure = now;
+      throw e;
+    },
+  );
+  inflight = p;
+  return p;
 }
 
 async function fetchKeys(opts: AccessJwtOptions, now: number): Promise<Map<string, CryptoKey>> {
@@ -69,16 +104,21 @@ async function fetchKeys(opts: AccessJwtOptions, now: number): Promise<Map<strin
     throw new AuthError("jwks unavailable", 503);
   }
   const keys = new Map<string, CryptoKey>();
-  const list = isPlainObject(doc) && Array.isArray(doc.keys) ? doc.keys : [];
-  for (const jwk of list.slice(0, 20)) {
-    if (!isPlainObject(jwk) || jwk.kty !== "RSA" || typeof jwk.kid !== "string" || typeof jwk.n !== "string") continue;
+  const list = isPlainObject(doc) && Array.isArray(doc.keys) ? doc.keys.slice(0, 20) : [];
+  // A kid that appears twice is ambiguous: use neither.
+  const kidCount = new Map<unknown, number>();
+  for (const jwk of list) if (isPlainObject(jwk)) kidCount.set(jwk.kid, (kidCount.get(jwk.kid) ?? 0) + 1);
+  for (const jwk of list) {
+    if (!isPlainObject(jwk) || jwk.kty !== "RSA" || typeof jwk.kid !== "string" || !jwk.kid || typeof jwk.n !== "string") continue;
+    if (kidCount.get(jwk.kid) !== 1) continue;
     if (jwk.use !== undefined && jwk.use !== "sig") continue;
     if (jwk.alg !== undefined && jwk.alg !== "RS256") continue;
+    if (jwk.e !== "AQAB") continue; // 65537 only; a tiny exponent makes forgeries trivial
     try {
       if (b64urlDecode(jwk.n).length < 256) continue; // < 2048-bit modulus
       const key = await crypto.subtle.importKey(
         "jwk",
-        { kty: "RSA", n: jwk.n, e: jwk.e as string, alg: "RS256", ext: true },
+        { kty: "RSA", n: jwk.n, e: "AQAB", alg: "RS256", ext: true },
         { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
         false,
         ["verify"],
@@ -95,10 +135,10 @@ async function fetchKeys(opts: AccessJwtOptions, now: number): Promise<Map<strin
 
 async function keyFor(kid: string, opts: AccessJwtOptions, now: number): Promise<CryptoKey> {
   const fresh = cache && cache.team === opts.teamDomain && now - cache.fetchedAt < JWKS_TTL_MS;
-  let keys = fresh ? cache!.keys : await fetchKeys(opts, now);
+  let keys = fresh ? cache!.keys : await fetchKeysOnce(opts, now);
   let key = keys.get(kid);
-  if (!key && fresh && now - cache!.fetchedAt >= JWKS_MIN_REFRESH_MS) {
-    keys = await fetchKeys(opts, now); // key rotation: refresh once, rate limited
+  if (!key && fresh && now - Math.max(cache!.fetchedAt, lastAttempt) >= JWKS_MIN_REFRESH_MS) {
+    keys = await fetchKeysOnce(opts, now); // key rotation: refresh once, rate limited
     key = keys.get(kid);
   }
   if (!key) throw new AuthError("unknown kid");
@@ -130,6 +170,8 @@ export async function verifyAccessJwt(token: string | null, opts: AccessJwtOptio
   }
   if (header.alg !== "RS256") throw new AuthError("bad alg");
   if (header.crit !== undefined) throw new AuthError("crit not supported");
+  if (FORBIDDEN_HEADERS.some((k) => k in header)) throw new AuthError("unsupported header");
+  if (header.typ !== undefined && header.typ !== "JWT") throw new AuthError("unsupported header");
   if (typeof header.kid !== "string" || !header.kid) throw new AuthError("missing kid");
 
   const nowMs = (opts.now ?? Date.now)();
@@ -147,9 +189,13 @@ export async function verifyAccessJwt(token: string | null, opts: AccessJwtOptio
     throw new AuthError("not yet valid");
   }
   if (claims.common_name !== undefined) throw new AuthError("service token not allowed", 403);
+  // Access application tokens carry type "app"; "org" (team-domain session) tokens must not
+  // be accepted by an application even if their audience were to match.
+  if (claims.type !== undefined && claims.type !== "app") throw new AuthError("not an application token", 403);
   if (typeof claims.sub !== "string" || !claims.sub) throw new AuthError("missing sub", 403);
   if (typeof claims.email !== "string") throw new AuthError("missing email", 403);
-  const email = claims.email.trim().toLowerCase();
+  if (!RAW_EMAIL_RE.test(claims.email)) throw new AuthError("bad email", 403);
+  const email = claims.email.toLowerCase();
   if (!EMAIL_RE.test(email)) throw new AuthError("bad email", 403);
   return { email, sub: claims.sub };
 }

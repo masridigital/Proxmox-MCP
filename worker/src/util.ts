@@ -45,8 +45,12 @@ export function canonicalJson(value: unknown): string {
 function sortKeys(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(sortKeys);
   if (value && typeof value === "object") {
+    // defineProperty, not assignment: an own "__proto__" key must stay a key (assignment
+    // would call the prototype setter and silently drop it from the hash).
     const out: Record<string, unknown> = {};
-    for (const k of Object.keys(value).sort()) out[k] = sortKeys((value as Record<string, unknown>)[k]);
+    for (const k of Object.keys(value).sort()) {
+      Object.defineProperty(out, k, { value: sortKeys((value as Record<string, unknown>)[k]), enumerable: true, writable: true, configurable: true });
+    }
     return out;
   }
   return value;
@@ -100,9 +104,11 @@ export function cleanText(s: string, max = 300): string {
   return t.length > max ? `${t.slice(0, max)}...` : t;
 }
 
-const strictDecoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: false });
+// ignoreBOM: true keeps a leading U+FEFF in the string (instead of silently stripping it), so
+// the strict JSON parser rejects BOM-prefixed bodies (RFC 8259 section 8.1).
+const strictDecoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 
-/** Strict UTF-8 decode: invalid byte sequences throw instead of becoming U+FFFD. */
+/** Strict UTF-8 decode: invalid byte sequences throw instead of becoming U+FFFD; a BOM is kept. */
 export function decodeUtf8(bytes: Uint8Array): string {
   return strictDecoder.decode(bytes);
 }
