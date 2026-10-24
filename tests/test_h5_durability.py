@@ -43,9 +43,10 @@ def test_threads_and_tasks_keep_one_chain(log_path):
             await asyncio.sleep(0)
             audit.audit_event(kind="task", i=i)
 
-        await asyncio.gather(*(one(i) for i in range(40)),
-                             *(asyncio.to_thread(audit.audit_event, kind="to_thread", i=i)
-                               for i in range(40)))
+        await asyncio.gather(
+            *(one(i) for i in range(40)),
+            *(asyncio.to_thread(audit.audit_event, kind="to_thread", i=i) for i in range(40)),
+        )
 
     for t in threads:
         t.start()
@@ -177,8 +178,14 @@ def test_windows_code_path(log_path, monkeypatch):
 
 def test_line_cap(log_path):
     huge = {f"k{i}": "v" * 1000 for i in range(40)}
-    audit.audit_event(kind="x", user="a@example.com", status="ok",
-                      notes=["n" * 1000] * 50, extra="e" * 5000, more=huge)
+    audit.audit_event(
+        kind="x",
+        user="a@example.com",
+        status="ok",
+        notes=["n" * 1000] * 50,
+        extra="e" * 5000,
+        more=huge,
+    )
     line = log_path.read_text().splitlines()[-1]
     assert len(line.encode()) <= audit.MAX_LINE_BYTES
     rec = json.loads(line)
@@ -214,8 +221,19 @@ class FakeProxmox:
 
 async def test_tool_call_denied_when_audit_cannot_be_written(log_path, tmp_path, monkeypatch):
     enrollment = tmp_path / "enrollment.json"
-    enrollment.write_text(json.dumps({"users": {"alice@example.com": {
-        "mode": "ro", "proxmox_userid": "alice@pve", "token_credential": "pve-token-alice"}}}))
+    enrollment.write_text(
+        json.dumps(
+            {
+                "users": {
+                    "alice@example.com": {
+                        "mode": "ro",
+                        "proxmox_userid": "alice@pve",
+                        "token_credential": "pve-token-alice",
+                    }
+                }
+            }
+        )
+    )
     monkeypatch.setenv("MCP_ENROLLMENT_FILE", str(enrollment))
     monkeypatch.setattr(server, "proxmox", FakeProxmox())
     called = []
@@ -233,7 +251,8 @@ async def test_tool_call_denied_when_audit_cannot_be_written(log_path, tmp_path,
     monkeypatch.setattr(audit, "_write_fd", full)
     ok, text = await server.run_tool(
         Identity(subject="alice@example.com", kind="user", email="alice@example.com"),
-        "list_nodes", {},
+        "list_nodes",
+        {},
     )
     assert ok is False and called == []
     assert audit.health()["ok"] is False

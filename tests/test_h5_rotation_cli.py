@@ -102,8 +102,22 @@ def test_cli_summary_fields(log_path, capsys):
     audit.audit_event(kind="x")
     code, summary = run_cli(capsys, [log_path])
     assert code == 0
-    for key in ("ok", "files", "lines", "breaks", "gaps", "problems", "first_ts", "last_ts",
-                "first_seq", "last_seq", "last_hash", "mac", "anchor", "exit"):
+    for key in (
+        "ok",
+        "files",
+        "lines",
+        "breaks",
+        "gaps",
+        "problems",
+        "first_ts",
+        "last_ts",
+        "first_seq",
+        "last_seq",
+        "last_hash",
+        "mac",
+        "anchor",
+        "exit",
+    ):
         assert key in summary, key
     assert summary["lines"] == 2 and summary["mac"]["status"] == "absent"
     assert summary["first_ts"] <= summary["last_ts"]
@@ -163,5 +177,7 @@ def test_verify_never_writes(log_path, capsys):
     audit.audit_event(kind="x")
     before = {p.name: p.read_bytes() for p in log_path.parent.iterdir()}
     run_cli(capsys, ["--dir", log_path.parent])
-    after = {p.name: p.read_bytes() for p in log_path.parent.iterdir() if not p.name.endswith(".lock")}
+    after = {
+        p.name: p.read_bytes() for p in log_path.parent.iterdir() if not p.name.endswith(".lock")
+    }
     assert {k: v for k, v in before.items() if not k.endswith(".lock")} == after

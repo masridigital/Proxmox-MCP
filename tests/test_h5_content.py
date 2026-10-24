@@ -78,13 +78,16 @@ def _rand_value(rng: random.Random, depth: int = 0):
 
 @pytest.mark.parametrize("seed", range(25))
 def test_property_no_values_secrets_or_phi(log_path, seed):
-    rng = random.Random(seed)
+    rng = random.Random(seed)  # noqa: S311 - seeded test data, not crypto
     args = {_rand_word(rng): _rand_value(rng) for _ in range(rng.randint(1, 6))}
     # A PHI-bearing key name too: keys are recorded, so they are sanitized.
     args[rng.choice(SENSITIVE)] = 1
     free_text = rng.choice(SENSITIVE)
     audit.audit_event(
-        side="in", user="a@example.com", kind="user", tool="execute_tool",
+        side="in",
+        user="a@example.com",
+        kind="user",
+        tool="execute_tool",
         target=rng.choice(["list_nodes", rng.choice(SENSITIVE)]),
         args=args,
         arg_keys=sorted(args),
@@ -93,8 +96,11 @@ def test_property_no_values_secrets_or_phi(log_path, seed):
         path=f"/nodes/pve/qemu/100/{rng.choice(SENSITIVE)}",
         data={"description": rng.choice(SENSITIVE)},
         notes=[rng.choice(SENSITIVE), {"x": rng.choice(SENSITIVE)}],
-        **{rng.choice(["password", "api_key", "authorization", "cookie", "private_key"]):
-           rng.choice(SENSITIVE)},
+        **{
+            rng.choice(
+                ["password", "api_key", "authorization", "cookie", "private_key"]
+            ): rng.choice(SENSITIVE)
+        },
     )
     text = log_path.read_text()
     for value in SENSITIVE:
@@ -107,11 +113,19 @@ def test_property_no_values_secrets_or_phi(log_path, seed):
 
 
 def test_required_soc2_fields(log_path):
-    token = current_identity.set(Identity(subject="a@example.com", kind="user", ray_id="8a1b2c3d4e5f6a7b-IAD"))
+    token = current_identity.set(
+        Identity(subject="a@example.com", kind="user", ray_id="8a1b2c3d4e5f6a7b-IAD")
+    )
     try:
         with audit.bind(jti="11111111-2222-3333-4444-555555555555", svc="0123.access"):
-            audit.audit_event(side="in", tool="execute_tool", target="list_nodes",
-                              rpc="execute", status="denied", deny="mode ro")
+            audit.audit_event(
+                side="in",
+                tool="execute_tool",
+                target="list_nodes",
+                rpc="execute",
+                status="denied",
+                deny="mode ro",
+            )
     finally:
         current_identity.reset(token)
     rec = recs(log_path)[-1]
@@ -155,8 +169,17 @@ def test_bind_is_scoped(log_path):
 
 
 def test_reserved_fields_cannot_be_forged(log_path):
-    audit.audit_event(kind="x", ts="1999", seq=-5, ph="genesis", mac="0" * 64, kid="evil",
-                      mono=0.0, eid="e", pid=1)
+    audit.audit_event(
+        kind="x",
+        ts="1999",
+        seq=-5,
+        ph="genesis",
+        mac="0" * 64,
+        kid="evil",
+        mono=0.0,
+        eid="e",
+        pid=1,
+    )
     rec = recs(log_path)[-1]
     assert rec["seq"] == 1 and rec["ts"] != "1999" and rec["ph"] != "genesis"
     assert rec.get("kid") != "evil" and rec["eid"] != "e" and rec["pid"] != 1
@@ -171,8 +194,14 @@ def test_start_event_has_change_evidence(log_path):
 
 
 def test_token_id_kept_but_secret_dropped(log_path):
-    audit.audit_event(side="out", kind="proxmox", token_id="alice@pve!mcp",
-                      method="GET", path="/nodes/pve/qemu/100/status/current", status=200)
+    audit.audit_event(
+        side="out",
+        kind="proxmox",
+        token_id="alice@pve!mcp",
+        method="GET",
+        path="/nodes/pve/qemu/100/status/current",
+        status=200,
+    )
     rec = recs(log_path)[-1]
     assert rec["token_id"] == "alice@pve!mcp"
     assert rec["path"] == "/nodes/pve/qemu/100/status/current"
@@ -186,6 +215,6 @@ def test_identifier_fields_sanitized(log_path):
 
 
 def test_control_characters_cannot_split_lines(log_path):
-    audit.audit_event(kind="x", deny="a\nb\r\n{\"seq\":0}")
+    audit.audit_event(kind="x", deny='a\nb\r\n{"seq":0}')
     assert len(log_path.read_text().splitlines()) == 2
     assert audit.verify_chain(log_path) == 0

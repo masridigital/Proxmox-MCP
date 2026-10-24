@@ -58,8 +58,10 @@ def test_every_line_carries_mac_when_key_present(creds, log_path):
     assert all(re.fullmatch(r"[0-9a-f]{64}", r["mac"]) for r in lines)
     assert len({r["kid"] for r in lines}) == 1
     # mac is the last key, so the verifier can recover the signed bytes exactly.
-    assert all(line.endswith('"}') and '"mac":"' in line.rsplit(",", 1)[-1]
-               for line in log_path.read_text().splitlines())
+    assert all(
+        line.endswith('"}') and '"mac":"' in line.rsplit(",", 1)[-1]
+        for line in log_path.read_text().splitlines()
+    )
     summary = audit.verify_files([log_path], keys=audit.load_key_files([keyfile(log_path.parent)]))
     assert summary["breaks"] == 0 and summary["mac"]["status"] == "verified"
 
@@ -191,9 +193,7 @@ def test_truncation_detected_with_anchor(log_path):
     summary = audit.verify_files([log_path], anchor=anchor)
     assert summary["breaks"] >= 1 and summary["anchor"]["ok"] is False
     assert audit.verify_files([log_path], anchor=(2, "0" * 64))["anchor"]["ok"] is False
-    good = audit.verify_files(
-        [log_path], anchor=(2, audit.line_hash(raw[2].encode()))
-    )
+    good = audit.verify_files([log_path], anchor=(2, audit.line_hash(raw[2].encode())))
     assert good["anchor"]["ok"] is True and good["breaks"] == 0
 
 
