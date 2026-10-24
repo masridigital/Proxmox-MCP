@@ -2,7 +2,9 @@
 
 Tiers
 -----
-read       GET only, no secrets in the response beyond what output redaction handles.
+read       GET only, no secrets in the response beyond what output redaction handles, and
+           not a bulk, unfiltered or host-wide dump (HIPAA minimum necessary): raw host
+           logs and per-connection firewall logs are admin, pvereport is forbidden.
 operate    Reversible guest lifecycle: start / stop / shutdown / reboot / reset / suspend /
            resume of one VM or CT, and taking a snapshot. Nothing is lost by doing it.
 admin      Destructive or config-changing work on guests and guest-level objects: create,
@@ -70,9 +72,6 @@ TOOL_TIERS: dict[str, Tier] = {
     "get_node_netstat": R,
     "list_node_services": R,
     "get_node_service_state": R,
-    "get_node_syslog": R,
-    "get_node_journal": R,
-    "get_node_report": R,
     "get_node_subscription": R,
     "get_node_apt_update": R,  # GET /apt/update only lists pending updates; it does not refresh
     "get_node_apt_changelog": R,
@@ -82,6 +81,15 @@ TOOL_TIERS: dict[str, Tier] = {
     "get_node_aplinfo": R,
     "get_node_capabilities_qemu": R,
     "get_node_scan": R,  # GET /scan/{type}; no server/credential args are passed
+    # Raw host logs (H2, HIPAA 164.502(b) minimum necessary): syslog and the journal are
+    # host-wide and unfiltered (sshd/pvedaemon logins with user names and source IPs, any
+    # service's output), served by Sys.Syslog on the node rather than scoped to the caller's
+    # pool. Not for ro/operator; a rw admin may pull them deliberately (admin flag on).
+    "get_node_syslog": A,
+    "get_node_journal": A,
+    # pvereport runs as root and dumps every guest config, iptables-save, corosync and
+    # storage config, whatever the caller's ACL allows: a bulk dump, human-only.
+    "get_node_report": F,
     # Host configuration that is low-impact and reversible.
     "set_node_time": A,  # PUT /time: timezone only
     "revert_node_network": A,  # DELETE /network: discards pending (unapplied) changes
@@ -108,9 +116,11 @@ TOOL_TIERS: dict[str, Tier] = {
     "get_vm_migrate_preconditions": R,
     "get_vm_firewall_rules": R,
     "get_vm_firewall_options": R,
-    "get_vm_firewall_log": R,
     "get_vm_rrddata": R,
     "get_vm_feature": R,
+    # Per-connection firewall log: source IPs of whoever talks to the guest (for a clinical
+    # app, patients' IP addresses, a HIPAA identifier). Minimum necessary: admin only.
+    "get_vm_firewall_log": A,
     # Guest-agent facts (filesystem list, NIC addresses, OS name/version) are hypervisor-style
     # metadata, not file contents or command output, so they stay read (COMPLIANCE review).
     "vm_agent_get_fsinfo": R,
@@ -291,10 +301,11 @@ TOOL_TIERS: dict[str, Tier] = {
     "list_firewall_ipset_entries": R,
     "list_node_firewall_rules": R,
     "get_node_firewall_options": R,
-    "get_node_firewall_log": R,
-    "get_cluster_firewall_log": R,
     "list_firewall_macros": R,
     "list_firewall_refs": R,
+    # Connection logs (source IPs): admin only, see get_vm_firewall_log.
+    "get_node_firewall_log": A,
+    "get_cluster_firewall_log": A,
     # The cluster and host firewall protect the management plane this broker itself uses.
     # Any rule, option, group, alias or ipset change there can open it or disable it.
     # Guest-level firewall changes are admin (qemu.py / lxc.py above).
@@ -417,7 +428,6 @@ TOOL_TIERS: dict[str, Tier] = {
     "list_sendmail_endpoints": R,
     "get_sendmail_endpoint": R,
     "list_smtp_endpoints": R,
-    "list_webhook_endpoints": R,
     "list_notification_matchers": R,
     "get_notification_matcher": R,
     "list_notification_matcher_fields": R,
@@ -431,6 +441,9 @@ TOOL_TIERS: dict[str, Tier] = {
     "delete_sendmail_endpoint": F,
     "create_smtp_endpoint": F,
     "delete_smtp_endpoint": F,
+    # Webhook URLs and header values are commonly the credential itself (a chat hook URL, an
+    # Authorization header), and key-name redaction cannot see them. Human-only, even to list.
+    "list_webhook_endpoints": F,
     "create_webhook_endpoint": F,
     "delete_webhook_endpoint": F,
     "create_notification_matcher": F,
@@ -485,6 +498,8 @@ FORBIDDEN_PATTERNS: tuple[str, ...] = (
     r"download_url",
     r"agent_(file|exec|set_user)",
     r"(^|_)(term|vnc|spice)_?proxy",
+    r"node_report",
+    r"webhook_endpoint",
 )
 FORBIDDEN_RE = re.compile("|".join(f"(?:{p})" for p in FORBIDDEN_PATTERNS))
 
@@ -584,6 +599,8 @@ def catalog_for(mode: Mode) -> list[dict[str, Any]]:
                     "description": tool_def["description"],
                     "inputSchema": copy.deepcopy(tool_def["inputSchema"]),
                     "tier": tool_tier(name),
+                    # Tools module name (qemu, lxc, nodes, ...) for the Worker's summary view.
+                    "category": REGISTRY[name][1].__name__.rsplit(".", 1)[-1],
                 }
             )
     return out

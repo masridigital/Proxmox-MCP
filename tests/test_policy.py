@@ -306,7 +306,7 @@ def test_catalog_for_modes(monkeypatch):
     ro = policy.catalog_for("ro")
     assert ro == sorted(ro, key=lambda d: d["name"])
     assert {d["tier"] for d in ro} == {"read"}
-    assert set(ro[0]) == {"name", "description", "inputSchema", "tier"}
+    assert set(ro[0]) == {"name", "description", "inputSchema", "tier", "category"}
     op = {d["tier"] for d in policy.catalog_for("operator")}
     assert op == {"read", "operate"}
     assert "admin" not in {d["tier"] for d in policy.catalog_for("rw")}
@@ -411,7 +411,8 @@ def test_invalid_file_denies_everyone(tmp_path, monkeypatch):
 def test_enrollment_reloads_on_change(tmp_path):
     path = _write(tmp_path, {"users": {"a@example.com": _entry("ro")}})
     assert enrollment.load_enrollments(path)["a@example.com"].mode == "ro"
-    _write(tmp_path, {"users": {"a@example.com": _entry("rw"), "b@example.com": _entry()}})
+    _write(tmp_path, {"users": {"a@example.com": _entry("rw"),
+                                "b@example.com": _entry("ro", "bob@pve", "pve-token-bob")}})
     assert enrollment.load_enrollments(path)["a@example.com"].mode == "rw"
 
 

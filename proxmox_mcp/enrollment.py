@@ -18,8 +18,11 @@ read from ``MCP_ENROLLMENT_FILE`` or, by default, ``$CREDENTIALS_DIRECTORY/enrol
 Rules (fail closed):
 - Validation is strict. Unknown keys, unknown modes, malformed emails, ``root@pam`` and
   bad credential names make the whole file invalid, and an invalid file grants nobody.
-- A missing file grants nobody.
-- Emails are compared lowercased. Service identities (Access service tokens) need their own
+- A missing file grants nobody. A symlink, a non-regular file or a file over 1 MB is invalid.
+- The file is re-read on every lookup and the parse is cached by content hash, so a
+  revocation takes effect on the next call (no stat-based staleness).
+- Emails must be ASCII (checked before lowercasing; see _email_key) and are compared
+  lowercased. Service identities (Access service tokens) need their own
   entry under ``services`` keyed by their subject; they never match a user entry.
 - The stdio (``local``) identity is a developer on the host. It gets a synthetic enrollment
   whose mode comes from ``MCP_LOCAL_MODE`` (default ``ro``) and an empty ``token_credential``,
@@ -31,10 +34,13 @@ for that person's privilege-separated Proxmox API token. The secret itself never
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import logging
 import os
 import re
+import stat
 import threading
 from dataclasses import dataclass
 from typing import Any, Literal, get_args
@@ -118,7 +124,9 @@ def parse_enrollments(doc: Any) -> dict[str, Enrollment]:
     if not isinstance(users, dict):
         raise EnrollmentError('"users" must be an object')
     for raw_email, entry in users.items():
-        email = raw_email.strip().lower() if isinstance(raw_email, str) else ""
+        email = _email_key(raw_email.strip()) if isinstance(raw_email, str) else None
+        if email is None:
+            raise EnrollmentError(f"not an email address: {raw_email!r}")
         if len(email) > 254 or not _EMAIL_RE.fullmatch(email):
             raise EnrollmentError(f"not an email address: {raw_email!r}")
         if email in out:
@@ -135,7 +143,44 @@ def parse_enrollments(doc: Any) -> dict[str, Enrollment]:
         if key in out:
             raise EnrollmentError(f"service {subject} is enrolled twice")
         out[key] = _parse_entry(subject, entry)
+    _require_one_person_one_key(out)
     return out
+
+
+def _require_one_person_one_key(table: dict[str, Enrollment]) -> None:
+    """MCP-STD-01 "one person, one key": no two subjects (users or services) may share a
+    token_credential or a proxmox_userid, or Proxmox's task log could not name the person.
+    Compared case-insensitively (Windows credential files are case-insensitive; a userid
+    differing only in case is too close to call). A violation invalidates the whole file.
+    """
+    seen_cred: dict[str, str] = {}
+    seen_user: dict[str, str] = {}
+    for entry in table.values():
+        cred = entry.token_credential.lower()
+        if cred in seen_cred:
+            raise EnrollmentError(
+                f"{entry.subject} and {seen_cred[cred]} share token_credential {entry.token_credential}"
+            )
+        seen_cred[cred] = entry.subject
+        userid = entry.proxmox_userid.lower()
+        if userid in seen_user:
+            raise EnrollmentError(
+                f"{entry.subject} and {seen_user[userid]} share proxmox_userid {entry.proxmox_userid}"
+            )
+        seen_user[userid] = entry.subject
+
+
+def _email_key(value: str) -> str | None:
+    """Lowercased lookup key for an email, or None when it is not a plain ASCII address.
+
+    ASCII is checked BEFORE lowercasing: str.lower() maps some non-ASCII code points onto
+    ASCII (U+212A KELVIN SIGN -> "k"), so lowercasing first would let "\\u212aate@..."
+    match kate@... (H2 finding). No stripping either: a signed identity is matched exactly.
+    """
+    if not value.isascii():
+        return None
+    key = value.lower()
+    return key if len(key) <= 254 and _EMAIL_RE.fullmatch(key) else None
 
 
 def _service_key(subject: str) -> str:
@@ -155,39 +200,86 @@ def default_path() -> str | None:
     return None
 
 
+MAX_FILE_BYTES = 1_000_000
+
 _cache_lock = threading.Lock()
-_cache: dict[str, tuple[tuple[int, int, int], dict[str, Enrollment]]] = {}
+# path -> (sha256 of the bytes, parsed table). Keyed by CONTENT, not by stat: a same-size
+# edit inside one mtime tick (rw -> ro, same inode) must not be served from cache, or a
+# revocation is missed (H2 finding).
+_cache: dict[str, tuple[bytes, dict[str, Enrollment]]] = {}
+
+
+def _read_file(path: str) -> bytes | None:
+    """The file's bytes, or None when it does not exist.
+
+    Refuses a symlink as the final component (O_NOFOLLOW where the OS has it, plus an lstat
+    check), anything but a regular file, and anything over MAX_FILE_BYTES, checked on the
+    opened descriptor so a swap between check and read cannot change what is measured.
+    """
+    try:
+        lst = os.lstat(path)
+    except FileNotFoundError:
+        return None
+    if stat.S_ISLNK(lst.st_mode):
+        raise EnrollmentError("enrollment file must not be a symlink")
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
+    try:
+        fd = os.open(path, flags)
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        raise EnrollmentError(f"cannot open enrollment file: {exc.strerror}") from None
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode):
+            raise EnrollmentError("enrollment file must be a regular file")
+        if st.st_size > MAX_FILE_BYTES:
+            raise EnrollmentError("enrollment file is larger than 1 MB")
+        chunks = []
+        remaining = MAX_FILE_BYTES + 1
+        while remaining > 0:
+            chunk = os.read(fd, min(remaining, 65536))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        data = b"".join(chunks)
+    finally:
+        os.close(fd)
+    if len(data) > MAX_FILE_BYTES:
+        raise EnrollmentError("enrollment file is larger than 1 MB")
+    return data
 
 
 def load_enrollments(path: str | None = None) -> dict[str, Enrollment]:
-    """Read and validate the enrollment file. Cached; reloaded when the file changes.
+    """Read and validate the enrollment file. The file is read on every call (it is small)
+    and the parse is cached by content hash, so every change is seen immediately.
 
     Missing file (or no path configured) -> {} (nobody enrolled).
-    Invalid file -> EnrollmentError.
+    Invalid, symlinked, non-regular or oversize file -> EnrollmentError.
     """
     path = path or default_path()
     if not path:
         return {}
-    try:
-        st = os.stat(path)
-    except FileNotFoundError:
+    data = _read_file(path)
+    if data is None:
         return {}
-    stamp = (st.st_mtime_ns, st.st_size, st.st_ino)
+    digest = hashlib.sha256(data).digest()
     with _cache_lock:
         hit = _cache.get(path)
-        if hit and hit[0] == stamp:
+        if hit and hmac.compare_digest(hit[0], digest):
             return hit[1]
-    with open(path, encoding="utf-8") as fh:
-        text = fh.read(1_000_000 + 1)
-    if len(text) > 1_000_000:
-        raise EnrollmentError("enrollment file is larger than 1 MB")
     try:
-        doc = json.loads(text, object_pairs_hook=_reject_duplicates)
+        doc = json.loads(data.decode("utf-8"), object_pairs_hook=_reject_duplicates)
+    except UnicodeDecodeError:
+        raise EnrollmentError("enrollment file is not UTF-8") from None
     except json.JSONDecodeError as exc:
         raise EnrollmentError(f"not valid JSON: {exc.msg} at line {exc.lineno}") from None
+    except RecursionError:
+        raise EnrollmentError("enrollment file is nested too deeply") from None
     result = parse_enrollments(doc)
     with _cache_lock:
-        _cache[path] = (stamp, result)
+        _cache[path] = (digest, result)
     return result
 
 
@@ -216,8 +308,9 @@ def enrollment_for(identity: Identity) -> Enrollment:
         raise PermissionError("not enrolled") from None
 
     if identity.kind == "user":
-        key = (identity.email or identity.subject or "").strip().lower()
-        found = table.get(key) if _EMAIL_RE.fullmatch(key) else None
+        raw = identity.email or identity.subject or ""
+        key = _email_key(raw) if isinstance(raw, str) else None
+        found = table.get(key) if key else None
     elif identity.kind == "service":
         found = table.get(_service_key(identity.subject))
     else:
