@@ -55,7 +55,7 @@ def test_upstream_reference_is_reproducible():
     """upstream_calls.json still matches the upstream modules taken from git history."""
     root = Path(__file__).resolve().parents[1]
     have = subprocess.run(
-        ["git", "cat-file", "-e", "a63576c:proxmox_mcp/tools/qemu.py"],
+        ["git", "cat-file", "-e", "a63576c:proxmox_mcp/tools/qemu.py"],  # noqa: S607
         cwd=root,
         capture_output=True,
     )

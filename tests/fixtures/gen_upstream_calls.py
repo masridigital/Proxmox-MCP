@@ -61,7 +61,7 @@ def _extract(commit: str, dest: Path) -> None:
     (pkg / "client.py").write_text("class ProxmoxClient:\n    pass\n")
     for mod in UPSTREAM_MODULES:
         src = subprocess.run(
-            ["git", "show", f"{commit}:proxmox_mcp/tools/{mod}.py"],
+            ["git", "show", f"{commit}:proxmox_mcp/tools/{mod}.py"],  # noqa: S607
             cwd=ROOT,
             check=True,
             capture_output=True,

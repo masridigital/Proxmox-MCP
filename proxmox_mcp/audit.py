@@ -168,7 +168,9 @@ _NO_PHI_CHECK = frozenset({"user", "svc", "token_id"})  # identities are logged 
 # Correlation ids are random (often UUIDs): pattern-checked, not secret-scrubbed.
 _CORRELATION = frozenset({"jti", "request_id", "ray", "client"})
 _KEY_RE = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
-_SEGMENT_RE = re.compile(r"^[A-Za-z0-9_.:@=+-]{0,128}$")
+# Path segments already passed outbound validation; "!" (UPID token ids) and "%" (encoded
+# volume ids) are legitimate there and auditors need the real target (SOC 2 CC7.2 "what").
+_SEGMENT_RE = re.compile(r"^[A-Za-z0-9_.:@=+!%-]{0,128}$")
 _ARGS_FIELDS = {"args": ("arg_keys", "args_sha256")}
 # Kept when a line must shrink to fit MAX_LINE_BYTES.
 _CORE = frozenset({
