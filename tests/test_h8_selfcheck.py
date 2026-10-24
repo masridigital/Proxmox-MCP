@@ -29,9 +29,11 @@ def put(d, name, text, mode=0o400):
 
 
 def pub_pem(key) -> str:
-    return key.public_key().public_bytes(
-        serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo
-    ).decode()
+    return (
+        key.public_key()
+        .public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo)
+        .decode()
+    )
 
 
 @pytest.fixture
@@ -52,10 +54,18 @@ def broker(tmp_path, monkeypatch):
         "MCP_AUDIT_LOG": str(logs / "audit.jsonl"),
     }
     users = {
-        "Alice@Example.com": {"mode": "operator", "proxmox_userid": "mcp-alice@pve",
-                              "token_credential": "pve-token-alice", "token_expires": "2027-01-31"},
-        "bob@example.com": {"mode": "ro", "proxmox_userid": "mcp-bob@pve",
-                            "token_credential": "pve-token-bob", "token_expires": "2027-01-31"},
+        "Alice@Example.com": {
+            "mode": "operator",
+            "proxmox_userid": "mcp-alice@pve",
+            "token_credential": "pve-token-alice",
+            "token_expires": "2027-01-31",
+        },
+        "bob@example.com": {
+            "mode": "ro",
+            "proxmox_userid": "mcp-bob@pve",
+            "token_credential": "pve-token-bob",
+            "token_expires": "2027-01-31",
+        },
     }
     put(creds, "pve-token-alice", f"mcp-alice@pve!mcp={SECRETS['alice']}\n")
     put(creds, "pve-token-bob", f"mcp-bob@pve!mcp={SECRETS['bob']}\n")
@@ -96,7 +106,8 @@ def test_clean_broker_only_warns_about_missing_expiry(broker):
     fails = [c for c in report["checks"] if c["status"] == "fail"]
     assert fails == []
     assert {c["id"] for c in report["checks"] if c["status"] == "warn"} == {
-        "token_expiry:alice@example.com", "token_expiry:bob@example.com"
+        "token_expiry:alice@example.com",
+        "token_expiry:bob@example.com",
     }
     assert report["status"] == "warn" and report["exit_code"] == selfcheck.EXIT_WARN
     assert by_id(report, "worker_key")[0]["status"] == "pass"
@@ -140,8 +151,12 @@ def test_expiry_in_file_rejected_until_enrollment_patch(broker):
     report = run(broker)
     status = by_id(report, "enrollment")[0]["status"]
     # Today the broker would refuse this file, and selfcheck says so; after patch E1 it passes.
-    expected = "pass" if "token_expires" in getattr(enrollment, "_ENTRY_KEYS", ()) or hasattr(
-        enrollment, "_OPTIONAL_KEYS") else "fail"
+    expected = (
+        "pass"
+        if "token_expires" in getattr(enrollment, "_ENTRY_KEYS", ())
+        or hasattr(enrollment, "_OPTIONAL_KEYS")
+        else "fail"
+    )
     assert status == expected
 
 
@@ -150,7 +165,10 @@ def test_bad_config_stops_early(broker):
     report = run(broker)
     assert [c["id"] for c in report["checks"]] == ["config"]
     assert report["exit_code"] == selfcheck.EXIT_FAIL
-    assert any("did you mean MCP_ALLOW_ADMIN_TOOLS" in p for p in report["checks"][0]["details"]["problems"])
+    assert any(
+        "did you mean MCP_ALLOW_ADMIN_TOOLS" in p
+        for p in report["checks"][0]["details"]["problems"]
+    )
 
 
 def test_dangerous_flags_are_warnings(broker):
@@ -184,7 +202,9 @@ def test_shared_user_credential_or_secret_fails(broker):
     broker.write_enrollment()
     shared = by_id(run(broker), "dedicated_user")
     assert {c["message"].split(" shared")[0] for c in shared} == {
-        "Proxmox user", "token credential", "token secret"
+        "Proxmox user",
+        "token credential",
+        "token secret",
     }
 
 
@@ -214,9 +234,15 @@ def test_worker_key(broker, kind):
     elif kind == "ecdsa":
         put(broker.creds, "worker-identity.pub", pub_pem(ec.generate_private_key(ec.SECP256R1())))
     elif kind == "private":
-        pem = ed25519.Ed25519PrivateKey.generate().private_bytes(
-            serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()
-        ).decode()
+        pem = (
+            ed25519.Ed25519PrivateKey.generate()
+            .private_bytes(
+                serialization.Encoding.PEM,
+                serialization.PrivateFormat.PKCS8,
+                serialization.NoEncryption(),
+            )
+            .decode()
+        )
         put(broker.creds, "worker-identity.pub", pem)
     else:
         put(broker.creds, "worker-identity.pub", "not a key")
@@ -274,10 +300,17 @@ def test_evaluate_permissions():
         "rw",
     )
     joined = "\n".join(bad)
-    for needle in ("propagates from /", "Datastore.Allocate on /", "Sys.Console is never",
-                   "Realm.AllocateUser is never", "Sys.Modify is never", "VM.Console is never",
-                   "VM.GuestAgent.Unrestricted is never", "Permissions.Modify is never",
-                   "User.Modify is never"):
+    for needle in (
+        "propagates from /",
+        "Datastore.Allocate on /",
+        "Sys.Console is never",
+        "Realm.AllocateUser is never",
+        "Sys.Modify is never",
+        "VM.Console is never",
+        "VM.GuestAgent.Unrestricted is never",
+        "Permissions.Modify is never",
+        "User.Modify is never",
+    ):
         assert needle in joined, needle
     assert selfcheck.evaluate_permissions({"/storage/x": {"Datastore.Allocate": 0}}, "rw") == []
     assert selfcheck.evaluate_permissions([], "ro") == ["unexpected /access/permissions response"]
@@ -323,7 +356,8 @@ def test_live_pass_and_fail(broker):
     assert "/pool/mcp: VM.PowerMgmt exceeds mode ro" in bob["details"]["violations"]
     assert any("propagates from /" in v for v in bob["details"]["violations"])
     assert {(m, p) for m, p, _ in seen} == {
-        ("GET", "/api2/json/version"), ("GET", "/api2/json/access/permissions")
+        ("GET", "/api2/json/version"),
+        ("GET", "/api2/json/access/permissions"),
     }
     assert {a for *_, a in seen} == {
         f"PVEAPIToken=mcp-alice@pve!mcp={SECRETS['alice']}",

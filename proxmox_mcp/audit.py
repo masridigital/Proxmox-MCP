@@ -743,10 +743,21 @@ def _get_log() -> AuditLog:
                     "catalog_sha256": _catalog_hash(),
                     "host": socket.gethostname(),
                     "hmac": log.kid or "none",
+                    **_config_fields(),
                 }
             )
             log._started = True
     return log
+
+
+def _config_fields() -> dict[str, Any]:
+    """Role, dangerous flags, TLS mode and config hash for the start event (SOC 2 CC8.1)."""
+    try:
+        from . import config
+
+        return dict(config.audit_start_fields())
+    except Exception:  # noqa: BLE001 - the start event must never fail on this
+        return {}
 
 
 def start() -> None:

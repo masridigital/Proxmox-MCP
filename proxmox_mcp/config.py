@@ -101,6 +101,7 @@ KNOWN_VARS: dict[str, str] = {
     "PROXMOX_READ_ONLY": "1 refuses every non-GET request (kill switch)",
     "PROXMOX_TIMEOUT": "Proxmox request timeout in seconds, 1-600 (default 30)",
     "PROXMOX_MAX_RESPONSE_BYTES": "Proxmox response cap, 64 KiB-1 GiB (default 64 MiB)",
+    "PROXMOX_TOTAL_TIMEOUT": "whole-request Proxmox deadline in seconds, 1-3600 (default 120)",
     # stdio developer identity (forbidden on the broker)
     "PROXMOX_USER": "stdio only: Proxmox user@realm of the developer token",
     "PROXMOX_TOKEN_NAME": "stdio only: token name of the developer token",
@@ -118,6 +119,7 @@ KNOWN_VARS: dict[str, str] = {
     "MCP_PHI_CONTACT": "1 also redacts e-mail addresses and phone numbers",
     # audit and secrets
     "MCP_AUDIT_LOG": "absolute path of the hash-chained audit log",
+    "MCP_AUDIT_HMAC": "auto | required | off: keyed audit chain (production: required)",
     "MCP_ENROLLMENT_FILE": "absolute path of enrollment.json",
     "BROKER_CREDENTIALS_DIR": "absolute path of the broker credential directory (Windows)",
     "BROKER_DPAPI_ENTROPY_FILE": "absolute path of the DPAPI entropy file (Windows)",
@@ -252,6 +254,7 @@ class Settings:
     proxmox_insecure_tls: bool = False
     proxmox_read_only: bool = False
     proxmox_timeout: int = 30
+    proxmox_total_timeout: int = 120
     proxmox_max_response_bytes: int = 64 * 1024 * 1024
     # stdio developer identity
     proxmox_user: str | None = None
@@ -270,6 +273,7 @@ class Settings:
     phi_contact: bool = False
     # audit + secrets
     audit_log: str | None = None  # None: audit.default_path()
+    audit_hmac: str = "auto"
     credentials_dir: str | None = None
     enrollment_file: str | None = None
     dpapi_entropy_file: str | None = None
@@ -442,7 +446,11 @@ def unknown_variables(environ: Mapping[str, str]) -> list[str]:
     for name in sorted(environ):
         if name in REMOVED_VARS:
             problems.append(f"{name}: {REMOVED_VARS[name]}")
-        elif name.startswith(CHECKED_PREFIXES) and name not in KNOWN_VARS and name not in FOREIGN_VARS:
+        elif (
+            name.startswith(CHECKED_PREFIXES)
+            and name not in KNOWN_VARS
+            and name not in FOREIGN_VARS
+        ):
             problems.append(f"unknown variable {name}{_suggest(name)}")
     return problems
 
@@ -462,7 +470,9 @@ def load(environ: Mapping[str, str] | None = None, *, role: str = "broker") -> S
         r.problems.append("PROXMOX_HOST is required")
         host = ""
     elif not valid_host(host):
-        r.problems.append("PROXMOX_HOST must be a host name or IP literal (no scheme, port or path)")
+        r.problems.append(
+            "PROXMOX_HOST must be a host name or IP literal (no scheme, port or path)"
+        )
     ca_bundle = r.abspath("PROXMOX_CA_BUNDLE")
     if ca_bundle is not None and not os.path.isfile(ca_bundle):
         r.problems.append("PROXMOX_CA_BUNDLE does not name an existing file")
@@ -587,6 +597,7 @@ def load(environ: Mapping[str, str] | None = None, *, role: str = "broker") -> S
         proxmox_insecure_tls=insecure,
         proxmox_read_only=r.boolean("PROXMOX_READ_ONLY", False),
         proxmox_timeout=r.integer("PROXMOX_TIMEOUT", 30, 1, 600),
+        proxmox_total_timeout=r.integer("PROXMOX_TOTAL_TIMEOUT", 120, 1, 3600),
         proxmox_max_response_bytes=r.integer(
             "PROXMOX_MAX_RESPONSE_BYTES", 64 * 1024 * 1024, 64 * 1024, 1024**3
         ),
@@ -603,6 +614,7 @@ def load(environ: Mapping[str, str] | None = None, *, role: str = "broker") -> S
         max_result_bytes=r.integer("MCP_MAX_RESULT_BYTES", 2 * 1024 * 1024, 1024, 64 * 1024**2),
         phi_contact=r.boolean("MCP_PHI_CONTACT", False),
         audit_log=r.abspath("MCP_AUDIT_LOG"),
+        audit_hmac=r.choice("MCP_AUDIT_HMAC", "auto", ("auto", "required", "off")),
         credentials_dir=credentials_dir,
         enrollment_file=enrollment_file,
         dpapi_entropy_file=r.abspath("BROKER_DPAPI_ENTROPY_FILE"),

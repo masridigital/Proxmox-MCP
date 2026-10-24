@@ -187,13 +187,21 @@ def overall(checks: Iterable[Check]) -> tuple[str, int]:
 # ---- offline checks ----------------------------------------------------------------------
 
 
-def check_config(environ: Mapping[str, str] | None, role: str) -> tuple[config.Settings | None, list[Check]]:
+def check_config(
+    environ: Mapping[str, str] | None, role: str
+) -> tuple[config.Settings | None, list[Check]]:
     try:
         settings = config.load(environ, role=role)
     except config.ConfigError as exc:
         return None, [_fail("config", "configuration is invalid", problems=exc.problems)]
-    checks = [_ok("config", "configuration is valid", config_sha256=settings.config_sha256(),
-                  tls_mode=settings.tls_mode)]
+    checks = [
+        _ok(
+            "config",
+            "configuration is valid",
+            config_sha256=settings.config_sha256(),
+            tls_mode=settings.tls_mode,
+        )
+    ]
     for flag in settings.dangerous_flags():
         checks.append(_warn("dangerous_flags", f"{flag} is active", flag=flag))
     return settings, checks
@@ -214,7 +222,9 @@ def check_credentials_dir(settings: config.Settings) -> list[Check]:
     if st.st_mode & stat.S_IWOTH or st.st_mode & stat.S_IWGRP:
         return [_fail("credentials_dir", "credential directory is writable by group or others")]
     if st.st_mode & stat.S_IRWXO:
-        return [_warn("credentials_dir", "credential directory is accessible to others (expect 0700)")]
+        return [
+            _warn("credentials_dir", "credential directory is accessible to others (expect 0700)")
+        ]
     return [_ok("credentials_dir", "exists, not accessible to others")]
 
 
@@ -225,7 +235,11 @@ def check_stray_private_keys(settings: config.Settings) -> list[Check]:
     except OSError:
         return []
     for entry in names:
-        name = entry[: -len(credentials.DPAPI_SUFFIX)] if entry.endswith(credentials.DPAPI_SUFFIX) else entry
+        name = (
+            entry[: -len(credentials.DPAPI_SUFFIX)]
+            if entry.endswith(credentials.DPAPI_SUFFIX)
+            else entry
+        )
         if not credentials.NAME_RE.match(name):
             continue
         try:
@@ -236,8 +250,13 @@ def check_stray_private_keys(settings: config.Settings) -> list[Check]:
             found.append(name)
         del text
     if found:
-        return [_fail("stray_private_key", "private key material in the credential directory; "
-                      "remove it and rotate the key", credentials=found)]
+        return [
+            _fail(
+                "stray_private_key",
+                "private key material in the credential directory; remove it and rotate the key",
+                credentials=found,
+            )
+        ]
     return [_ok("stray_private_key", "no private keys in the credential directory")]
 
 
@@ -250,7 +269,11 @@ def check_enrollment(
 ) -> tuple[dict[str, enrollment.Enrollment], dict[str, Any], list[Check]]:
     path = settings.enrollment_file
     if not path or not os.path.isfile(path):
-        return {}, {}, [_fail("enrollment", "enrollment file is missing (nobody can use the broker)")]
+        return (
+            {},
+            {},
+            [_fail("enrollment", "enrollment file is missing (nobody can use the broker)")],
+        )
     try:
         table = enrollment.load_enrollments(path)
         with open(path, encoding="utf-8") as fh:
@@ -263,8 +286,17 @@ def check_enrollment(
             raw[_subject_key(section, subject)] = entry
     if not table:
         return table, raw, [_warn("enrollment", "enrollment file grants nobody")]
-    return table, raw, [_ok("enrollment", f"{len(table)} subject(s) enrolled",
-                            modes={k: e.mode for k, e in sorted(table.items())})]
+    return (
+        table,
+        raw,
+        [
+            _ok(
+                "enrollment",
+                f"{len(table)} subject(s) enrolled",
+                modes={k: e.mode for k, e in sorted(table.items())},
+            )
+        ],
+    )
 
 
 def check_tokens(table: Mapping[str, enrollment.Enrollment]) -> list[Check]:
@@ -296,16 +328,29 @@ def check_tokens(table: Mapping[str, enrollment.Enrollment]) -> list[Check]:
         if ent.proxmox_userid.lower() == "root@pam":
             checks.append(_fail(cid, "token belongs to root@pam", token_id=token_id))
         elif realm == "pam":
-            checks.append(_warn(cid, "token user is a @pam (Linux) account; use a dedicated @pve user",
-                                token_id=token_id))
+            checks.append(
+                _warn(
+                    cid,
+                    "token user is a @pam (Linux) account; use a dedicated @pve user",
+                    token_id=token_id,
+                )
+            )
         else:
             checks.append(_ok(cid, "token readable and matches proxmox_userid", token_id=token_id))
-    for label, groups in (("Proxmox user", by_userid), ("token credential", by_cred),
-                          ("token secret", by_digest)):
+    for label, groups in (
+        ("Proxmox user", by_userid),
+        ("token credential", by_cred),
+        ("token secret", by_digest),
+    ):
         for subjects in groups.values():
             if len(subjects) > 1:
-                checks.append(_fail("dedicated_user", f"{label} shared by several subjects "
-                                    "(one person, one key)", subjects=subjects))
+                checks.append(
+                    _fail(
+                        "dedicated_user",
+                        f"{label} shared by several subjects (one person, one key)",
+                        subjects=subjects,
+                    )
+                )
     return checks
 
 
@@ -329,8 +374,13 @@ def check_token_expiry(
         if value is None and isinstance(raw.get(key), dict):
             value = raw[key].get("token_expires")
         if value is None:
-            checks.append(_warn(cid, "no token_expires recorded; create tokens with --expire "
-                                "and record the date in enrollment.json"))
+            checks.append(
+                _warn(
+                    cid,
+                    "no token_expires recorded; create tokens with --expire "
+                    "and record the date in enrollment.json",
+                )
+            )
             continue
         try:
             expires = value if isinstance(value, dt.date) else parse_token_expires(value)
@@ -341,10 +391,15 @@ def check_token_expiry(
         if left <= 0:
             checks.append(_fail(cid, "token has expired; rotate it", expires=expires.isoformat()))
         elif left <= warn_days:
-            checks.append(_warn(cid, f"token expires in {left} day(s); rotate it",
-                                expires=expires.isoformat()))
+            checks.append(
+                _warn(
+                    cid, f"token expires in {left} day(s); rotate it", expires=expires.isoformat()
+                )
+            )
         else:
-            checks.append(_ok(cid, f"token valid for {left} more day(s)", expires=expires.isoformat()))
+            checks.append(
+                _ok(cid, f"token valid for {left} more day(s)", expires=expires.isoformat())
+            )
     return checks
 
 
@@ -358,8 +413,13 @@ def check_worker_key(settings: config.Settings) -> list[Check]:
     except credentials.CredentialError as exc:
         return [_fail("worker_key", f"cannot read {ia.PUBLIC_KEY_CREDENTIAL}: {exc}")]
     if "PRIVATE KEY" in pem:
-        return [_fail("worker_key", f"{ia.PUBLIC_KEY_CREDENTIAL} holds a PRIVATE key; remove it "
-                      "from the broker and rotate the Worker key")]
+        return [
+            _fail(
+                "worker_key",
+                f"{ia.PUBLIC_KEY_CREDENTIAL} holds a PRIVATE key; remove it "
+                "from the broker and rotate the Worker key",
+            )
+        ]
     try:
         ia.load_public_key(pem)
     except ia.AssertionConfigError as exc:
@@ -367,15 +427,24 @@ def check_worker_key(settings: config.Settings) -> list[Check]:
     return [_ok("worker_key", "Ed25519 public key")]
 
 
-def check_modes(settings: config.Settings, table: Mapping[str, enrollment.Enrollment]) -> list[Check]:
+def check_modes(
+    settings: config.Settings, table: Mapping[str, enrollment.Enrollment]
+) -> list[Check]:
     rw = sorted(k for k, e in table.items() if e.mode == "rw")
     if not rw:
         return [_ok("modes", "no rw enrollments")]
     if not settings.allow_admin_tools:
-        return [_fail("modes", "rw enrollments without MCP_ALLOW_ADMIN_TOOLS=1 grant DELETE at the "
-                      "outbound policy with no admin tool to use it; enroll them as operator",
-                      subjects=rw)]
-    return [_warn("modes", "rw enrollments with admin tools enabled; review quarterly", subjects=rw)]
+        return [
+            _fail(
+                "modes",
+                "rw enrollments without MCP_ALLOW_ADMIN_TOOLS=1 grant DELETE at the "
+                "outbound policy with no admin tool to use it; enroll them as operator",
+                subjects=rw,
+            )
+        ]
+    return [
+        _warn("modes", "rw enrollments with admin tools enabled; review quarterly", subjects=rw)
+    ]
 
 
 def check_audit_path(settings: config.Settings) -> list[Check]:
@@ -392,8 +461,14 @@ def check_audit_path(settings: config.Settings) -> list[Check]:
             os.close(fd)
             os.unlink(probe)
     except OSError as exc:
-        return [_fail("audit_path", f"audit log is not writable ({type(exc).__name__})",
-                      path=path, checked_as=who)]
+        return [
+            _fail(
+                "audit_path",
+                f"audit log is not writable ({type(exc).__name__})",
+                path=path,
+                checked_as=who,
+            )
+        ]
     return [_ok("audit_path", "audit log is writable", path=path, checked_as=who)]
 
 
@@ -401,7 +476,9 @@ def check_audit_path(settings: config.Settings) -> list[Check]:
 
 
 async def _get(http: httpx.AsyncClient, url: str, header: str) -> Any:
-    req = http.build_request("GET", url, headers={"Authorization": header, "Accept": "application/json"})
+    req = http.build_request(
+        "GET", url, headers={"Authorization": header, "Accept": "application/json"}
+    )
     try:
         response = await http.send(req, stream=True, follow_redirects=False)
         try:
@@ -432,12 +509,17 @@ async def live_checks(
     base = client_mod.base_url(settings.proxmox_host, str(settings.proxmox_port))
     if transport is None:
         pins = tuple(bytes.fromhex(p) for p in settings.proxmox_tls_fingerprints)
-        ctx = client_mod.build_ssl_context(settings.proxmox_ca_bundle or "", pins,
-                                           settings.proxmox_insecure_tls)
+        ctx = client_mod.build_ssl_context(
+            settings.proxmox_ca_bundle or "", pins, settings.proxmox_insecure_tls
+        )
         transport = client_mod.GuardedTransport(ctx, pins)
     checks: list[Check] = []
-    async with httpx.AsyncClient(transport=transport, timeout=httpx.Timeout(settings.proxmox_timeout),
-                                 follow_redirects=False, trust_env=False) as http:
+    async with httpx.AsyncClient(
+        transport=transport,
+        timeout=httpx.Timeout(settings.proxmox_timeout),
+        follow_redirects=False,
+        trust_env=False,
+    ) as http:
         for key, ent in sorted(table.items()):
             cid = f"live:{key}"
             try:
@@ -459,12 +541,25 @@ async def live_checks(
             problems = evaluate_permissions(perms, ent.mode)
             ver = version.get("version") if isinstance(version, dict) else None
             if problems:
-                checks.append(_fail(cid, "token holds privileges outside its mode", mode=ent.mode,
-                                    violations=problems, proxmox_version=ver))
+                checks.append(
+                    _fail(
+                        cid,
+                        "token holds privileges outside its mode",
+                        mode=ent.mode,
+                        violations=problems,
+                        proxmox_version=ver,
+                    )
+                )
             else:
-                checks.append(_ok(cid, "token privileges within mode", mode=ent.mode,
-                                  paths=len(perms) if isinstance(perms, dict) else 0,
-                                  proxmox_version=ver))
+                checks.append(
+                    _ok(
+                        cid,
+                        "token privileges within mode",
+                        mode=ent.mode,
+                        paths=len(perms) if isinstance(perms, dict) else 0,
+                        proxmox_version=ver,
+                    )
+                )
     return checks
 
 
@@ -523,8 +618,11 @@ def main(argv: list[str] | None = None) -> int:
     try:
         report = run_checks(role=args.role, live=args.live, warn_days=args.warn_days)
     except Exception as exc:  # the report must still be JSON; type only, no detail
-        print(json.dumps({"tool": "proxmox-mcp-selfcheck", "status": "crash",
-                          "error": type(exc).__name__}))
+        print(
+            json.dumps(
+                {"tool": "proxmox-mcp-selfcheck", "status": "crash", "error": type(exc).__name__}
+            )
+        )
         return EXIT_CRASH
     print(json.dumps(report, indent=2, sort_keys=False))
     return report["exit_code"]

@@ -46,8 +46,11 @@ def env(tmp_path, monkeypatch):
     os.chmod(p, 0o400)
     monkeypatch.delenv("BROKER_CREDENTIALS_DIR", raising=False)
     monkeypatch.setenv("CREDENTIALS_DIRECTORY", str(d))
-    table = {"alice@example.com": FakeEnrollment("alice@example.com", "operator", "mcp-alice@pve",
-                                                 "pve-token-alice")}
+    table = {
+        "alice@example.com": FakeEnrollment(
+            "alice@example.com", "operator", "mcp-alice@pve", "pve-token-alice"
+        )
+    }
 
     def fake_enrollment_for(identity):
         if identity.subject not in table:
@@ -62,8 +65,9 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setattr(client_mod.audit, "audit_event", lambda **f: audited.append(f))
     monkeypatch.setattr(client_mod, "require_identity", lambda: ALICE)
     c = client_mod.ProxmoxClient()
-    c.client = httpx.AsyncClient(transport=httpx.MockTransport(lambda r: responses["fn"](r)),
-                                 follow_redirects=False)
+    c.client = httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda r: responses["fn"](r)), follow_redirects=False
+    )
     return c, audited, responses
 
 
@@ -72,7 +76,7 @@ async def test_client_and_cache_never_render_token(env, caplog):
     with caplog.at_level(logging.DEBUG):
         assert await c.get("/nodes/pve/qemu/100/status/current") == {"data": "ok"}
     no_secret(c, c._token_cache, vars(c), audited)
-    (_, token), = c._token_cache.values()
+    ((_, token),) = c._token_cache.values()
     no_secret(token)
     assert all(SECRET not in r.getMessage() for r in caplog.records)
     assert all(SECRET not in str(r.args) for r in caplog.records)
@@ -128,7 +132,6 @@ def test_api_token_renderings():
     assert tok.token_id == "mcp-alice@pve!mcp"
 
 
-@pytest.mark.xfail(strict=True, reason="patch C3: client.request must drop Authorization after send")
 async def test_request_object_does_not_retain_token(env):
     c, _, responses = env
     responses["fn"] = lambda r: httpx.Response(500, json={"message": "boom"})
@@ -138,7 +141,6 @@ async def test_request_object_does_not_retain_token(env):
     assert "Authorization" not in ei.value.request.headers
 
 
-@pytest.mark.xfail(strict=True, reason="patch CR1: ApiToken must refuse pickling")
 def test_api_token_cannot_be_pickled():
     tok = credentials.parse_api_token(f"mcp-alice@pve!mcp={SECRET}")
     with pytest.raises(TypeError):

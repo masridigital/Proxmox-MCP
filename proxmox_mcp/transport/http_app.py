@@ -637,9 +637,9 @@ def main() -> None:
     from .. import server
 
     try:
+        server._validate_config("broker")
         settings = HttpSettings.from_env()
         check_bind(settings.bind)
-        server._validate_config()
         application = create_app(settings)
     except (ConfigError, AccessConfigError, AssertionConfigError, RuntimeError, ValueError) as exc:
         print(f"proxmox-mcp-http: refusing to start: {exc}", file=sys.stderr)

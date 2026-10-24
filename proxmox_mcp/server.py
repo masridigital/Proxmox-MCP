@@ -43,7 +43,7 @@ import mcp.server.stdio
 from mcp.server import Server
 from mcp.types import CallToolResult, TextContent, Tool, ToolAnnotations
 
-from . import audit, output, policy, router
+from . import audit, config, output, policy, router
 from .client import ProxmoxClient
 from .enrollment import enrollment_for
 from .identity import Identity, current_identity, require_identity
@@ -79,8 +79,18 @@ def tool_mode() -> str:
     return mode
 
 
-def _validate_config() -> None:
-    """Refuse to start on configuration this module cannot honour (fail closed)."""
+def _validate_config(role: str = "stdio") -> None:
+    """Refuse to start on configuration this module cannot honour (fail closed).
+
+    config.init applies the strict, typo-proof settings check for the role
+    (broker or stdio) and logs every dangerous flag; ConfigError is a RuntimeError.
+    """
+    if role == "stdio":
+        # Developer convenience only; the broker never reads a .env file.
+        from dotenv import load_dotenv
+
+        load_dotenv()
+    config.init(role)
     tool_mode()
     RateLimiter.from_env()  # raises on malformed MCP_RATE_* values
     if not router.REGISTRY:

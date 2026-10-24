@@ -282,13 +282,17 @@ def protect_main(argv: list[str] | None = None) -> int:
     return 0
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=False)
 class ApiToken:
     """A parsed Proxmox API token. repr() never shows the secret."""
 
     userid: str
     tokenname: str
     secret: str = field(repr=False)
+
+    def __reduce_ex__(self, protocol: object) -> object:
+        # No pickling or copying: a serialized token would outlive the request.
+        raise TypeError("ApiToken cannot be pickled or copied")
 
     @property
     def token_id(self) -> str:

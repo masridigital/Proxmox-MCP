@@ -78,7 +78,9 @@ def test_mcp_client_injected_variables_are_ignored(tmp_path):
     env = {"MCP_TOOL_TIMEOUT": "60000", "MCP_CONNECTION_NONBLOCKING": "true", "MCP_TIMEOUT": "1"}
     config.load(stdio_env(**env), role="stdio")
     config.load(broker_env(tmp_path, **env), role="broker")
-    assert any("MCP_TOOL_TIMEOUTS" in p for p in problems(broker_env(tmp_path, MCP_TOOL_TIMEOUTS="1")))
+    assert any(
+        "MCP_TOOL_TIMEOUTS" in p for p in problems(broker_env(tmp_path, MCP_TOOL_TIMEOUTS="1"))
+    )
 
 
 @pytest.mark.parametrize("value", ["true", "yes", "TRUE", "2", "1 ", " 1", "1\r", "on", "-1"])
@@ -114,7 +116,17 @@ def test_ints_are_bounded(tmp_path, name, value):
 
 @pytest.mark.parametrize(
     "host",
-    ["https://pve", "pve:8006", "pve/api", "-pve", "pve..lan", "300.1.1.1", "a" * 254, "pve_1", "[::1]"],
+    [
+        "https://pve",
+        "pve:8006",
+        "pve/api",
+        "-pve",
+        "pve..lan",
+        "300.1.1.1",
+        "a" * 254,
+        "pve_1",
+        "[::1]",
+    ],
 )
 def test_proxmox_host_validated(tmp_path, host):
     assert any("PROXMOX_HOST" in p for p in problems(broker_env(tmp_path, PROXMOX_HOST=host)))
@@ -143,8 +155,12 @@ def test_team_domain_must_be_https_origin(tmp_path, url):
 
 
 def test_access_settings_required_unless_disabled(tmp_path):
-    env = broker_env(tmp_path, CF_ACCESS_TEAM_DOMAIN=None, CF_ACCESS_AUD=None,
-                     BROKER_ALLOWED_SERVICE_CLIENT_IDS=None)
+    env = broker_env(
+        tmp_path,
+        CF_ACCESS_TEAM_DOMAIN=None,
+        CF_ACCESS_AUD=None,
+        BROKER_ALLOWED_SERVICE_CLIENT_IDS=None,
+    )
     assert len([p for p in problems(env) if "required while" in p]) == 3
     s = config.load({**env, "BROKER_REQUIRE_ACCESS_JWT": "0"})
     assert s.dangerous_flags() == ("BROKER_REQUIRE_ACCESS_JWT=0",)
@@ -177,8 +193,13 @@ def test_non_loopback_bind(tmp_path):
 def test_paths_must_be_absolute(tmp_path):
     for name in ("MCP_AUDIT_LOG", "MCP_ENROLLMENT_FILE", "BROKER_DPAPI_ENTROPY_FILE"):
         assert any(name in p for p in problems(broker_env(tmp_path, **{name: "rel/x"})))
-    assert any("BROKER_CREDENTIALS_DIR" in p for p in problems(broker_env(tmp_path, BROKER_CREDENTIALS_DIR="c")))
-    s = config.load(broker_env(tmp_path, MCP_AUDIT_LOG=r"C:\ProgramData\ProxmoxMCP\logs\audit.jsonl"))
+    assert any(
+        "BROKER_CREDENTIALS_DIR" in p
+        for p in problems(broker_env(tmp_path, BROKER_CREDENTIALS_DIR="c"))
+    )
+    s = config.load(
+        broker_env(tmp_path, MCP_AUDIT_LOG=r"C:\ProgramData\ProxmoxMCP\logs\audit.jsonl")
+    )
     assert s.audit_log.endswith("audit.jsonl")
 
 
@@ -191,24 +212,45 @@ def test_conflicting_credential_dirs(tmp_path):
 
 
 def test_broker_requires_credentials_dir(tmp_path):
-    assert any("BROKER_CREDENTIALS_DIR" in p for p in problems(broker_env(tmp_path, BROKER_CREDENTIALS_DIR=None)))
+    assert any(
+        "BROKER_CREDENTIALS_DIR" in p
+        for p in problems(broker_env(tmp_path, BROKER_CREDENTIALS_DIR=None))
+    )
 
 
 def test_ca_bundle_must_exist(tmp_path):
-    assert any("PROXMOX_CA_BUNDLE" in p for p in problems(broker_env(tmp_path, PROXMOX_CA_BUNDLE=str(tmp_path / "no.pem"))))
+    assert any(
+        "PROXMOX_CA_BUNDLE" in p
+        for p in problems(broker_env(tmp_path, PROXMOX_CA_BUNDLE=str(tmp_path / "no.pem")))
+    )
     pem = tmp_path / "ca.pem"
     pem.write_text("x")
-    assert config.load(broker_env(tmp_path, PROXMOX_CA_BUNDLE=str(pem))).proxmox_ca_bundle == str(pem)
+    assert config.load(broker_env(tmp_path, PROXMOX_CA_BUNDLE=str(pem))).proxmox_ca_bundle == str(
+        pem
+    )
 
 
 def test_fingerprint_and_lists(tmp_path):
-    assert any("FINGERPRINT" in p for p in problems(broker_env(tmp_path, PROXMOX_TLS_FINGERPRINT="abcd")))
-    assert any("FINGERPRINT" in p for p in problems(broker_env(tmp_path, PROXMOX_TLS_FINGERPRINT=PIN + ",")))
-    assert any("MCP_TOOL_DENY" in p for p in problems(broker_env(tmp_path, MCP_TOOL_DENY="(unclosed")))
-    assert any("MCP_TOOL_ALLOW" in p for p in problems(broker_env(tmp_path, MCP_TOOL_ALLOW="list nodes")))
+    assert any(
+        "FINGERPRINT" in p for p in problems(broker_env(tmp_path, PROXMOX_TLS_FINGERPRINT="abcd"))
+    )
+    assert any(
+        "FINGERPRINT" in p
+        for p in problems(broker_env(tmp_path, PROXMOX_TLS_FINGERPRINT=PIN + ","))
+    )
+    assert any(
+        "MCP_TOOL_DENY" in p for p in problems(broker_env(tmp_path, MCP_TOOL_DENY="(unclosed"))
+    )
+    assert any(
+        "MCP_TOOL_ALLOW" in p for p in problems(broker_env(tmp_path, MCP_TOOL_ALLOW="list nodes"))
+    )
     assert any("CF_ACCESS_AUD" in p for p in problems(broker_env(tmp_path, CF_ACCESS_AUD="short")))
-    assert any("MCP_ALLOWED_HOSTS" in p for p in problems(broker_env(tmp_path, MCP_ALLOWED_HOSTS="a b")))
-    s = config.load(broker_env(tmp_path, MCP_TOOL_DENY="^delete_,^destroy", MCP_ALLOWED_HOSTS="Broker.Internal"))
+    assert any(
+        "MCP_ALLOWED_HOSTS" in p for p in problems(broker_env(tmp_path, MCP_ALLOWED_HOSTS="a b"))
+    )
+    s = config.load(
+        broker_env(tmp_path, MCP_TOOL_DENY="^delete_,^destroy", MCP_ALLOWED_HOSTS="Broker.Internal")
+    )
     assert s.tool_deny == ("^delete_", "^destroy") and s.allowed_hosts == ("broker.internal",)
 
 
@@ -230,17 +272,26 @@ def test_stdio_does_not_require_broker_settings():
 
 
 def test_all_problems_reported_together(tmp_path):
-    env = broker_env(tmp_path, PROXMOX_HOST=None, MCP_PORT="0", MCP_ALLOW_ADMIN_TOOLS="yes", MCP_TYPO="1")
+    env = broker_env(
+        tmp_path, PROXMOX_HOST=None, MCP_PORT="0", MCP_ALLOW_ADMIN_TOOLS="yes", MCP_TYPO="1"
+    )
     assert len(problems(env)) >= 4
 
 
 def test_error_messages_never_contain_values(tmp_path):
     secret = "s3cr3t-VALUE-0000"
-    env = broker_env(tmp_path, **{
-        "PROXMOX_TOKEN_VALUE": secret, "MCP_PORT": secret, "PROXMOX_HOST": secret + "/x",
-        "MCP_ALLOW_ADMIN_TOOLS": secret, "CF_ACCESS_AUD": secret + " ", "MCP_UNKNOWN": secret,
-        "PROXMOX_PASSWORD": secret,
-    })
+    env = broker_env(
+        tmp_path,
+        **{
+            "PROXMOX_TOKEN_VALUE": secret,
+            "MCP_PORT": secret,
+            "PROXMOX_HOST": secret + "/x",
+            "MCP_ALLOW_ADMIN_TOOLS": secret,
+            "CF_ACCESS_AUD": secret + " ",
+            "MCP_UNKNOWN": secret,
+            "PROXMOX_PASSWORD": secret,
+        },
+    )
     with pytest.raises(config.ConfigError) as ei:
         config.load(env)
     assert secret not in str(ei.value) and secret not in repr(ei.value)
@@ -249,7 +300,7 @@ def test_error_messages_never_contain_values(tmp_path):
 def test_every_known_var_is_parsed():
     """KNOWN_VARS is the typo allowlist: each entry must be consumed by load()."""
     src = Path(config.__file__).read_text()
-    body = src[src.index("def load("):src.index("# ---- process-wide instance")]
+    body = src[src.index("def load(") : src.index("# ---- process-wide instance")]
     for name in config.KNOWN_VARS:
         assert f'"{name}"' in body, name
 
@@ -300,8 +351,14 @@ def test_config_hash_changes_with_settings(tmp_path):
 def test_settings_never_expose_token():
     s = config.load(stdio_env(), role="stdio")
     secret = "1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed"
-    for text in (repr(s), str(s), str(s.summary()), f"{s.proxmox_token_value}",
-                 repr(s.proxmox_token_value), str(s.proxmox_token_value)):
+    for text in (
+        repr(s),
+        str(s),
+        str(s.summary()),
+        f"{s.proxmox_token_value}",
+        repr(s.proxmox_token_value),
+        str(s.proxmox_token_value),
+    ):
         assert secret not in text
     assert s.summary()["proxmox_token_value"] == "<set>"
 
