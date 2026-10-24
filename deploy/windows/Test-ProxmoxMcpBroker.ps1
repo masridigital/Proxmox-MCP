@@ -3,16 +3,20 @@
 Post-install and periodic checks for the Windows broker. Exit code 0 = all PASS.
 
 .DESCRIPTION
-Checks: services, accounts and privileges; loopback-only listeners; firewall rules and
-logging; /healthz; cloudflared readiness; tunnel token not in argv; credential ACLs;
-audit hash chain; and (with -Baseline) the host hardening baseline: BitLocker with TPM,
+Checks: services, accounts and privileges; binary integrity (Authenticode, WinSW hash);
+loopback-only listeners; firewall rules and logging; /healthz; cloudflared readiness; tunnel
+token not in argv; file system ACLs (credentials, logs, program files); proxmox-mcp-selfcheck
+(offline, or --live with -Live); audit hash chain; and (with -Baseline) the host hardening baseline: BitLocker with TPM,
 Defender, LSA protection, Credential Guard, SMBv1 off, RDP NLA, Windows LAPS, audit policy.
 Read-only: it changes nothing. Output is a table you can attach as audit evidence:
   .\Test-ProxmoxMcpBroker.ps1 -Baseline | Tee-Object -FilePath evidence\broker-test.txt
 #>
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', 'Live', Justification = 'Used inside the Test-Step script block.')]
 [CmdletBinding()]
 param(
     [switch]$Baseline,
+    # Also run proxmox-mcp-selfcheck --live (asks Proxmox what each token may do).
+    [switch]$Live,
     # Skip the audit chain check (large files) when you only need a quick health view.
     [switch]$SkipAuditVerify
 )
@@ -151,18 +155,66 @@ Test-Step 'credential ACLs' {
     Add-Result 'credential ACLs' 'PASS' 'no broad ACEs, tokens DPAPI-protected'
 }
 
+# ---- Binary integrity ---------------------------------------------------------------------
+Test-Step 'binary integrity' {
+    Assert-AuthenticodeSigner -Path $PmcPythonExe -SignerCommonName 'Python Software Foundation'
+    $cfImg = (Get-ItemProperty -LiteralPath "HKLM:\SYSTEM\CurrentControlSet\Services\$PmcCfServiceName").ImagePath
+    if ($cfImg -notmatch '^"([^"]+)"') { throw 'cloudflared ImagePath is not a quoted path' }
+    Assert-AuthenticodeSigner -Path $Matches[1] -SignerCommonName 'Cloudflare, Inc.'
+    $winsw = Join-Path $PmcServiceDir "$PmcServiceName.exe"
+    $img = (Get-ItemProperty -LiteralPath "HKLM:\SYSTEM\CurrentControlSet\Services\$PmcServiceName").ImagePath.Trim('"')
+    if ($img -ne $winsw) { throw "broker ImagePath is '$img', expected $winsw" }
+    $h = (Get-FileHash -Algorithm SHA256 -LiteralPath $winsw).Hash.ToLowerInvariant()
+    Add-Result 'binary integrity' 'PASS' "python and cloudflared signed; WinSW sha256 $h (compare with the release record)"
+}
+
+# ---- File system ACLs -------------------------------------------------------------------------
+Test-Step 'program and log ACLs' {
+    $writeRights = [Security.AccessControl.FileSystemRights]'WriteData, AppendData, Delete, ChangePermissions, TakeOwnership, Write'
+    $trusted = @('S-1-5-32-544', 'S-1-5-18', 'S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464', 'S-1-3-0')
+    $svcSid = (New-Object Security.Principal.NTAccount($PmcServiceAccount)).Translate([Security.Principal.SecurityIdentifier]).Value
+    foreach ($p in @($PmcProgramDir, $PmcPythonDir, $PmcServiceDir, $PmcScriptsDir, (Get-PmcVenvDir), $PmcConfigDir)) {
+        foreach ($ace in (Get-Acl -LiteralPath $p).Access) {
+            $sid = $ace.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value
+            if ($ace.AccessControlType -eq 'Allow' -and ($ace.FileSystemRights -band $writeRights) -and $trusted -notcontains $sid) {
+                throw "$p grants write to $($ace.IdentityReference)"
+            }
+        }
+    }
+    foreach ($ace in (Get-Acl -LiteralPath $PmcLogDir).Access) {
+        $sid = $ace.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value
+        $del = [Security.AccessControl.FileSystemRights]'Delete, DeleteSubdirectoriesAndFiles, ChangePermissions, TakeOwnership'
+        if ($sid -eq $svcSid -and ($ace.FileSystemRights -band $del)) { throw 'the broker service can delete or re-permission audit logs' }
+    }
+    Add-Result 'program and log ACLs' 'PASS' 'no write for non-admins on code and config; service cannot delete audit logs'
+}
+
+# ---- Selfcheck (the broker's own view of its secrets and least privilege) ----------------------
+Test-Step 'proxmox-mcp-selfcheck' {
+    $args3 = @()
+    if ($Live) { $args3 += '--live' }
+    $r = Invoke-PmcBrokerTool -Tool 'proxmox-mcp-selfcheck' -ArgumentList $args3
+    $doc = $null
+    try { $doc = $r.Output | ConvertFrom-Json } catch { throw "selfcheck exit $($r.Code), output is not JSON" }
+    # Run as an administrator here: the audit_path check reflects this account, not the
+    # service. The ACL test above covers the service's write access.
+    $bad = @($doc.checks | Where-Object { $_.status -eq 'fail' -and $_.id -ne 'audit_path' })
+    $warn = @($doc.checks | Where-Object { $_.status -eq 'warn' })
+    if ($r.Code -eq 3) { throw 'selfcheck crashed (exit 3)' }
+    if ($bad.Count -gt 0) { throw ('selfcheck FAIL: ' + (($bad | ForEach-Object { "$($_.id): $($_.message)" }) -join '; ')) }
+    if ($warn.Count -gt 0) { Add-Result 'proxmox-mcp-selfcheck' 'WARN' (($warn | ForEach-Object { "$($_.id): $($_.message)" }) -join '; '); return }
+    Add-Result 'proxmox-mcp-selfcheck' 'PASS' ("{0} checks pass (live: {1})" -f @($doc.checks).Count, [bool]$Live)
+}
+
 # ---- Audit chain -----------------------------------------------------------------------
 if (-not $SkipAuditVerify) {
     Test-Step 'audit chain' {
-        $verify = Join-Path $PmcVenvDir 'Scripts\proxmox-mcp-audit-verify.exe'
         if (-not (Test-Path -LiteralPath $PmcAuditLog) -and @(Get-ChildItem -LiteralPath $PmcLogDir -File -Filter 'audit-*.jsonl').Count -eq 0) {
             Add-Result 'audit chain' 'WARN' 'no audit file yet'; return
         }
-        $env:BROKER_CREDENTIALS_DIR = $PmcCredDir
-        $env:BROKER_DPAPI_ENTROPY_FILE = $PmcEntropyFile
-        $env:MCP_AUDIT_LOG = $PmcAuditLog
-        $out = & $verify --dir $PmcLogDir --require-mac 2>&1 | Out-String
-        if ($LASTEXITCODE -ne 0) { throw "verify exit $LASTEXITCODE`: $($out.Trim())" }
+        $r = Invoke-PmcBrokerTool -Tool 'proxmox-mcp-audit-verify' -ArgumentList @('--dir', $PmcLogDir, '--require-mac')
+        $out = $r.Output
+        if ($r.Code -ne 0) { throw "verify exit $($r.Code): $($out.Trim())" }
         Add-Result 'audit chain' 'PASS' ($out.Trim() -replace '\s+', ' ')
     }
 }

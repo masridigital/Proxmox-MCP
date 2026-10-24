@@ -32,7 +32,7 @@ Residual is the rating after the controls.
 | T7 | Replay of identity assertions | 2 | 2 | 60 s lifetime, jti replay cache (120 s), body hash binding, method and path binding, audience `proxmox-broker`. | Low. A restart clears the replay cache; assertions older than 60 s fail anyway. |
 | T8 | SSRF through tool arguments | 2 | 3 | The broker calls only `PROXMOX_HOST:8006`. Outbound method and path allowlist, path segment validation. Windows Firewall allows the broker interpreter to reach only the Proxmox address on 8006 (and Cloudflare 443 in access mode for the JWKS). Workers VPC routes only to the configured service. Tools that download from URLs (for example ISO download) are forbidden. | Low. |
 | T9 | Path traversal or API injection in path parameters | 2 | 3 | `outbound.safe_segment` rejects `..`, `/`, `?`, `#`, `%` and control characters; the final path is re-checked against the allowlist. | Low. |
-| T10 | Theft of a Proxmox token | 1 | 3 | DPAPI LocalMachine with entropy plus a service-only ACL; never in argv, environment, logs or audit; privilege separation (token cannot exceed the user); pool-scoped ACLs; 90-day expiry; one person per token, so the Proxmox task log names the person. | Medium: an admin on the broker or a memory dump of the broker process can extract tokens. |
+| T10 | Theft of a Proxmox token | 1 | 3 | DPAPI LocalMachine with entropy plus a service-only ACL; never in argv, environment, logs or audit; privilege separation (token cannot exceed the user); pool-scoped ACLs; 90-day expiry (user expires with it); Windows Error Reporting and crash dumps off; one person per token, so the Proxmox task log names the person. | Medium: an admin on the broker or a memory dump of the broker process can extract tokens. |
 | T11 | Theft of the tunnel token | 1 | 2 | File ACL'd to the cloudflared service SID; not in ImagePath, argv or environment (checked by the test script). In access mode the tunnel ingress requires the broker Access JWT, so a rogue connector receives only Worker-signed traffic. | Medium: a rogue connector can take a share of the traffic until the token is rotated. Rotate on suspicion. |
 | T12 | DNS rebinding and Host header abuse against the loopback port | 1 | 2 | Host header allowlist (`broker.internal` or the broker hostname), JSON-only, no CORS, signed assertion required for every non-health request. | Low. |
 | T13 | LocalSystem misuse on Windows | 2 | 3 | Neither service runs as LocalSystem. The stock `cloudflared service install` (LocalSystem, and token in ImagePath before 2026.7.3) is not used. Only the audit shipping task runs as SYSTEM: its script lives in Program Files (Administrators write only). | Low. |
@@ -45,6 +45,15 @@ Residual is the rating after the controls.
 | T20 | Other Cloudflare account members bind a Worker to the VPC Service | 1 | 2 | The broker requires a valid identity assertion signed by the Worker key. Limit the Connectivity Directory roles. | Low. |
 | T21 | Denial of service (rate abuse, broker overload) | 2 | 1 | Rate limits in the Worker and on the broker, body caps, request timeout, Cloudflare edge. | Low. |
 | T22 | Workers VPC beta changes or outage | 2 | 1 | The access-mode fallback is fully scripted (`BROKER_MODE=access`). | Low. |
+| T23 | Unpatched Python runtime on the broker | 2 | 3 | The installer pins the Python installer by hash and signer and refuses any major.minor other than the lock's. The lock (`requirements/broker-win.txt`) targets CPython 3.12, whose last Windows installer is 3.12.10 (April 2025); later 3.12 security fixes are source-only, so a Windows broker on 3.12 cannot receive them. Decision: regenerate the lock for the newest CPython line that still ships Windows security builds (3.14 at the time of writing; 3.13 only as a short bridge, its binary releases end about October 2026). Every locked package has cp313 and cp314 win_amd64 wheels. Go-live gate G10. | High until the lock is regenerated; then Low with monthly patching. |
+| T24 | Secret captured by PowerShell logging or history (module logging 4103, transcription, PSReadLine) | 2 | 3 | Secrets come only from a hidden prompt or redirected stdin; never a parameter, environment variable, temp file or cmdlet parameter (only .NET calls see them); scripts reset `$PSDefaultParameterValues`; operators run with `-NoProfile`; clipboard history off. | Low. A key logger on an admin session defeats it (T3). |
+| T25 | Planted file or junction in `C:\ProgramData\ProxmoxMCP` (any user can create folders in ProgramData) | 2 | 3 | Installer locks the parent before it creates children, refuses a pre-existing folder not owned by Administrators/SYSTEM, refuses junctions and symlinks anywhere in the tree, resets owners and inheritance of log/config folders, and checks owners in the credential folder. | Low. |
+| T26 | Artifact swapped between hash check and execution (TOCTOU) | 1 | 3 | Every artifact is copied into an Administrators-only staging folder; the hash and signer of that copy are checked; that copy runs. The installed `python.exe` and `cloudflared.exe` signatures are checked on every run and by the test script. | Low. |
+| T27 | Spoofed Azure Arc identity endpoint (a local user listens on port 40342) makes the SYSTEM shipping task read a file | 1 | 3 | `Send-AuditLog.ps1` uses Arc only when the `himds` service runs, accepts only a small `.key` challenge file in the agent's Tokens folder, and never sends anything else. SAS mode does not use the endpoint. | Low. |
+| T28 | Audit key held by one person, or lost | 2 | 2 | Two-person XOR escrow with custodians who are not the broker administrator; yearly join check; re-key on custodian change (COMPLIANCE section 7). | Low. |
+| T29 | Least privilege drifts after setup (an admin adds an ACL by hand) | 2 | 2 | Daily `proxmox-mcp-selfcheck --live` measures every token's effective privileges against its mode and fails on excess; the Proxmox script converges ACLs and logs who ran it. | Low. |
+| T30 | Tunnel ingress pointed at a LAN service by a compromised Cloudflare account | 1 | 3 | Firewall blocks cloudflared from private, link-local, CGNAT and multicast ranges; it can only reach the broker on loopback. | Low. |
+| T31 | Third-party dependency `pywin32` (pulled in by the `mcp` SDK on Windows) contrary to the design | 2 | 1 | Installed from the hashed, wheel-only lock; not imported by the broker code. | Low; remove when the SDK drops it or the lock excludes it. |
 
 ## 3. Assumptions
 
@@ -58,9 +67,12 @@ Residual is the rating after the controls.
 - The Worker's tool filter is a user-experience filter and a first gate. The broker decides.
 - Claude's approval prompt for `execute_tool` helps, but users can set it to always allow.
 - DPAPI LocalMachine does not protect against a local administrator.
+- The installer's checks do not stop an administrator who wants to weaken the host. Separation
+  of duties (COMPLIANCE 6.9, 6.10) and the SACL and Security log do.
 
 ## 5. Review log
 
 | Date | Change | Reviewer |
 |---|---|---|
 | 2026-10-24 | First version for V2 (Worker + Windows broker) | DEPLOY agent (draft, needs owner review) |
+| 2026-10-24 | H10 hardening review: T23 to T31 added; TOCTOU, ACL, logging and escrow controls | H10 agent (draft, needs SO review) |

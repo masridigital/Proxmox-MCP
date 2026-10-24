@@ -12,7 +12,11 @@ Applies:
   - LSA protection (RunAsPPL = 2: enabled without UEFI lock; reboot needed).
   - Defender: real-time, behaviour, script scanning, cloud protection, PUA block,
     network protection on. Tamper protection is set from Defender for Endpoint / Intune.
-  - Security event log size 1 GB.
+  - Security event log size 1 GB; PowerShell operational log 256 MB.
+  - Windows Error Reporting off and no crash dumps (a dump of the broker process could
+    hold token bytes; see the memory-hygiene notes in proxmox_mcp/config.py).
+  - Clipboard history and cross-device clipboard off (no secret ever lands in a synced
+    clipboard).
 Reports only (decide and apply through GPO / Intune / Azure Arc policy; see docs/RUNBOOK.md):
   BitLocker with TPM, Windows LAPS, Credential Guard, RDP restriction, WDAC/AppLocker.
 Verify with: Test-ProxmoxMcpBroker.ps1 -Baseline
@@ -45,7 +49,7 @@ foreach ($g in $subcats.Keys) {
 
 function Set-RegDword {
     [CmdletBinding(SupportsShouldProcess)]
-    param([string]$Path, [string]$Name, [int]$Value)
+    param([Parameter(Mandatory)][string]$Path, [Parameter(Mandatory)][string]$Name, [Parameter(Mandatory)][int]$Value)
     if ($PSCmdlet.ShouldProcess("$Path\$Name", "Set DWORD $Value")) {
         if (-not (Test-Path -LiteralPath $Path)) { New-Item -Path $Path -Force | Out-Null }
         New-ItemProperty -LiteralPath $Path -Name $Name -PropertyType DWord -Value $Value -Force | Out-Null
@@ -54,9 +58,16 @@ function Set-RegDword {
 Set-RegDword 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\System\Audit' 'ProcessCreationIncludeCmdLine_Enabled' 1
 Set-RegDword 'HKLM:\Software\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging' 'EnableScriptBlockLogging' 1
 Set-RegDword 'HKLM:\SYSTEM\CurrentControlSet\Control\Lsa' 'RunAsPPL' 2
+Set-RegDword 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\Windows Error Reporting' 'Disabled' 1
+Set-RegDword 'HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps' 'DumpType' 0
+Set-RegDword 'HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps' 'DumpCount' 0
+Set-RegDword 'HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl' 'CrashDumpEnabled' 0
+Set-RegDword 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\System' 'AllowClipboardHistory' 0
+Set-RegDword 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\System' 'AllowCrossDeviceClipboard' 0
 
 if ($PSCmdlet.ShouldProcess('Security log', 'Max size 1 GB')) {
     Invoke-Native (Join-Path $env:SystemRoot 'System32\wevtutil.exe') @('sl', 'Security', '/ms:1073741824')
+    Invoke-Native (Join-Path $env:SystemRoot 'System32\wevtutil.exe') @('sl', 'Microsoft-Windows-PowerShell/Operational', '/ms:268435456')
 }
 
 if ($PSCmdlet.ShouldProcess('SMBv1', 'Disable')) {

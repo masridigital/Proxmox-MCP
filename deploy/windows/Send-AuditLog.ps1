@@ -12,6 +12,14 @@ lines added since the last run as ONE new block blob:
             host, fileid, offset, length.  Content-MD5 lets the service check transport.
   If-None-Match: *  so a blob is never replaced, even with a broader credential.
 
+Also uploads, once each, the evidence files under C:\ProgramData\ProxmoxMCP\evidence
+(selfcheck reports, access reviews) to <prefix>/<host>/evidence/, so they are WORM too.
+
+Event IDs (Application log, source ProxmoxMCP-AuditShip): 4001 ok, 4002 rotated,
+4003 immutability test ok, 4004 local file deleted after retention, 4101 file shrank,
+4102 upload failed, 4103 immutability test failed, 4105 chain verify failed,
+4106 SAS expires within 30 days.
+
 Credentials, in order:
   - Azure Arc managed identity (when the Arc agent is present and -Auth Arc): bearer token
     from the local Arc identity endpoint. Give the identity a custom role with
@@ -55,7 +63,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'ProxmoxMcp.Common.ps1')
 Assert-Administrator
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+Initialize-PmcTlsProtocol
 
 $cfgFile = Join-Path $PmcConfigDir 'ship.json'
 $stateFile = Join-Path $PmcShipDir 'state.json'
@@ -137,26 +145,50 @@ function Invoke-BlobRequest {
 
 $script:AuthQuery = ''
 $script:AuthHeader = @{}
+function Get-ArcToken {
+    # Azure Arc connected machine agent: local identity endpoint with a challenge file.
+    # Any local user can listen on port 40342 when the agent is not running, and the
+    # endpoint names a file for SYSTEM to read and send back. So: the agent service must
+    # be running, and the challenge file must be a small .key file in the agent's own
+    # Tokens folder. Otherwise a local user could make SYSTEM read any file.
+    $himds = Get-Service -Name 'himds' -ErrorAction SilentlyContinue
+    if (-not $himds -or $himds.Status -ne 'Running') { throw 'Azure Connected Machine agent (himds) is not running.' }
+    $uri = 'http://localhost:40342/metadata/identity/oauth2/token?api-version=2020-06-01&resource=https%3A%2F%2Fstorage.azure.com%2F'
+    $req = [Net.HttpWebRequest]::Create($uri)
+    $req.Headers.Add('Metadata', 'true'); $req.Timeout = 10000; $req.AllowAutoRedirect = $false
+    $realm = $null
+    try { $req.GetResponse().Dispose() } catch [Net.WebException] {
+        $r = $_.Exception.Response
+        if ($r) { $wa = $r.Headers['WWW-Authenticate']; $r.Dispose(); if ($wa -match 'realm=(\S+)') { $realm = $Matches[1].Trim() } }
+    }
+    $tokDir = Join-Path $env:ProgramData 'AzureConnectedMachineAgent\Tokens'
+    if (-not $realm) { throw 'Arc identity challenge failed.' }
+    $full = [IO.Path]::GetFullPath($realm)
+    if (-not $full.StartsWith($tokDir + '\', [StringComparison]::OrdinalIgnoreCase) -or $full -notmatch '\.key$') {
+        throw 'Arc identity challenge names a file outside the agent Tokens folder. Refused.'
+    }
+    if ((Get-Item -LiteralPath $full).Length -gt 4096) { throw 'Arc challenge file is too large. Refused.' }
+    $secret = [IO.File]::ReadAllText($full).Trim()
+    try {
+        $req = [Net.HttpWebRequest]::Create($uri)
+        $req.Headers.Add('Metadata', 'true'); $req.Headers.Add('Authorization', "Basic $secret"); $req.Timeout = 10000
+        $resp = $req.GetResponse()
+        try { $body = (New-Object IO.StreamReader($resp.GetResponseStream())).ReadToEnd() } finally { $resp.Dispose() }
+    } finally { $secret = $null }
+    if ($body -notmatch '"access_token"\s*:\s*"([^"]+)"') { throw 'Arc identity endpoint returned no access token.' }
+    return $Matches[1]
+}
+
 function Initialize-ShipAuth {
     if ($cfg.auth -eq 'Arc') {
-        # Azure Arc connected machine agent: local identity endpoint with a challenge file.
-        $uri = 'http://localhost:40342/metadata/identity/oauth2/token?api-version=2020-06-01&resource=https%3A%2F%2Fstorage.azure.com%2F'
-        $realm = $null
-        try {
-            Invoke-WebRequest -UseBasicParsing -Uri $uri -Headers @{ Metadata = 'true' } -TimeoutSec 10 | Out-Null
-        } catch {
-            $h = $_.Exception.Response.Headers
-            $wa = if ($h -is [Net.WebHeaderCollection]) { $h['WWW-Authenticate'] } else { ($h.WwwAuthenticate | Out-String) }
-            if ($wa -match 'realm=(\S+)') { $realm = $Matches[1].Trim() }
-        }
-        if (-not $realm -or -not (Test-Path -LiteralPath $realm)) { throw 'Arc identity challenge failed. Is the Azure Connected Machine agent installed?' }
-        $secret = (Get-Content -LiteralPath $realm -Raw).Trim()
-        $tok = Invoke-RestMethod -UseBasicParsing -Uri $uri -Headers @{ Metadata = 'true'; Authorization = "Basic $secret" } -TimeoutSec 10
-        $secret = $null
-        $script:AuthHeader = @{ Authorization = "Bearer $($tok.access_token)" }
+        $script:AuthHeader = @{ Authorization = "Bearer $(Get-ArcToken)" }
     } else {
         $sas = (Read-PmcProtectedText -Name 'audit-ship-sas').Trim().TrimStart('?')
         if ($sas -notmatch '(^|&)sp=c(&|$)') { throw 'audit-ship-sas must have sp=c only.' }
+        if ($sas -match '(^|&)se=(\d{4}-\d{2}-\d{2})') {
+            $left = ([datetime]::ParseExact($Matches[2], 'yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture) - (Get-Date)).TotalDays
+            if ($left -lt 30) { Write-ShipEvent 4106 ("audit-ship-sas expires in {0:N0} days. Issue a new sp=c SAS (RUNBOOK, Rotate)." -f $left) 'Warning' | Out-Null }
+        }
         $script:AuthQuery = $sas
     }
 }
@@ -215,9 +247,11 @@ if ($TestImmutability) {
 }
 
 # ---- Ship run ---------------------------------------------------------------------------
-$state = @{ files = @{} }
+$state = @{ files = @{}; evidence = @{} }
 if (Test-Path -LiteralPath $stateFile) {
     $raw = Get-Content -LiteralPath $stateFile -Raw | ConvertFrom-Json
+    $rawEv = Get-PmcProp $raw 'evidence'
+    if ($rawEv) { foreach ($p in $rawEv.PSObject.Properties) { $state.evidence[$p.Name] = [string]$p.Value } }
     foreach ($p in $raw.files.PSObject.Properties) {
         $state.files[$p.Name] = @{ path = $p.Value.path; offset = [int64]$p.Value.offset; prevsha256 = $p.Value.prevsha256
             month = $p.Value.month; complete = [bool]$p.Value.complete; gen = [int]$p.Value.gen }
@@ -231,7 +265,6 @@ function Save-State {
 
 $files = @(Get-ChildItem -LiteralPath $PmcLogDir -File -Filter 'audit-*.jsonl' | Sort-Object Name)
 if (Test-Path -LiteralPath $PmcAuditLog) { $files += Get-Item -LiteralPath $PmcAuditLog }
-if ($files.Count -eq 0) { Write-Output 'No audit files.'; exit 0 }
 
 Initialize-ShipAuth
 $shipped = 0
@@ -339,12 +372,9 @@ Save-State
 # ---- Anchor: verify the local chain and store the summary (last seq + hash) in WORM -----------
 # The auditor passes it to proxmox-mcp-audit-verify --anchor to prove the tail was not cut.
 if ($errors -eq 0 -and $shipped -gt 0) {
-    $verify = Join-Path $PmcVenvDir 'Scripts\proxmox-mcp-audit-verify.exe'
-    $env:BROKER_CREDENTIALS_DIR = $PmcCredDir
-    $env:BROKER_DPAPI_ENTROPY_FILE = $PmcEntropyFile
-    $env:MCP_AUDIT_LOG = $PmcAuditLog
-    $summary = & $verify --dir $PmcLogDir --require-mac 2>&1 | Out-String
-    $vcode = $LASTEXITCODE
+    $r = Invoke-PmcBrokerTool -Tool 'proxmox-mcp-audit-verify' -ArgumentList @('--dir', $PmcLogDir, '--require-mac')
+    $summary = $r.Output
+    $vcode = $r.Code
     if ($vcode -ne 0) {
         $errors++
         Write-ShipEvent 4105 "proxmox-mcp-audit-verify exit $vcode (chain break or missing mac): $($summary.Trim())" 'Error'
@@ -356,6 +386,31 @@ if ($errors -eq 0 -and $shipped -gt 0) {
         $r = Invoke-BlobRequest -Method PUT -Url (Get-BlobUrl $aname) -Headers $ahdr -Body $abody
         if ($r.Status -ne 201) { $errors++; Write-ShipEvent 4102 "Anchor upload failed: HTTP $($r.Status) $($r.ErrorCode)" 'Error' }
     }
+}
+
+# ---- Evidence files (selfcheck reports, access reviews): each uploaded once --------------
+if (-not $state.ContainsKey('evidence')) { $state.evidence = @{} }
+if (Test-Path -LiteralPath $PmcEvidenceDir) {
+    $evFiles = @(Get-ChildItem -LiteralPath $PmcEvidenceDir -File -Recurse -Include '*.json', '*.csv', '*.txt' |
+            Where-Object { $_.LastWriteTime -lt (Get-Date).AddMinutes(-2) })
+    foreach ($ev in $evFiles) {
+        $rel = $ev.FullName.Substring($PmcEvidenceDir.Length + 1).Replace('\', '/')
+        if ($state.evidence.ContainsKey($rel)) { continue }
+        $bytes = [IO.File]::ReadAllBytes($ev.FullName)
+        $sha = -join ((Get-Hash 'SHA256' $bytes) | ForEach-Object { $_.ToString('x2') })
+        $ename = '{0}/{1}/evidence/{2}' -f $cfg.prefix, $cfg.host, $rel
+        $ehdr = @{ 'x-ms-version' = $apiVersion; 'x-ms-blob-type' = 'BlockBlob'; 'Content-Type' = 'application/octet-stream'
+            'If-None-Match' = '*'; 'x-ms-meta-sha256' = $sha } + $script:AuthHeader
+        if (-not $PSCmdlet.ShouldProcess($ename, 'Upload evidence file')) { continue }
+        $r = Invoke-BlobRequest -Method PUT -Url (Get-BlobUrl $ename) -Headers $ehdr -Body $bytes
+        if ($r.Status -eq 201 -or ($r.Status -eq 409 -and $r.ErrorCode -eq 'BlobAlreadyExists')) {
+            $state.evidence[$rel] = $sha
+        } else {
+            $errors++
+            Write-ShipEvent 4102 "Upload of evidence $rel failed: HTTP $($r.Status) $($r.ErrorCode)" 'Error'
+        }
+    }
+    Save-State
 }
 
 if ($errors -gt 0) { exit 1 }

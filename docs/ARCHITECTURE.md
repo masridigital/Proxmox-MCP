@@ -124,13 +124,19 @@ Service. The broker still refuses that Worker, because it cannot sign identity a
 
 | Path | Contents | ACL |
 |---|---|---|
-| `C:\Program Files\ProxmoxMCP\python` | Private Python (python.org installer, hash + signature checked) | Administrators, SYSTEM full; service read/execute |
-| `C:\Program Files\ProxmoxMCP\venv` | Broker package and pinned dependencies | same |
-| `C:\Program Files\ProxmoxMCP\service` | WinSW v2.12.0 wrapper and XML | same |
-| `C:\ProgramData\ProxmoxMCP\credentials` | `enrollment.json` (plain), `*.dpapi` secrets, `worker-identity.pub`, `dpapi-entropy.bin` | Administrators, SYSTEM full; service read |
-| `C:\ProgramData\ProxmoxMCP\logs` | `audit.jsonl`, `audit-YYYYMM.jsonl` | Service create/append (no delete); SYSTEM full; Administrators read; SACL on delete and ACL change |
-| `C:\ProgramData\ProxmoxMCP\config` | `broker.env`, `ship.json` | Administrators, SYSTEM full; service read |
-| `C:\ProgramData\ProxmoxMCP\cloudflared` | `tunnel-token`, logs | Administrators, SYSTEM full; cloudflared service read (logs: modify) |
+| `C:\Program Files\ProxmoxMCP\python` | Private Python (python.org installer, hash + signer checked; major.minor must equal the lock header) | Administrators, SYSTEM full; service read/execute |
+| `C:\Program Files\ProxmoxMCP\venvs\<id>` | One venv per release (`<wheel sha>-<lock sha>-py<ver>`); the active and the previous one are kept for rollback | same |
+| `C:\Program Files\ProxmoxMCP\installed.json` | Active and previous venv, wheel and lock hashes, Python version | Administrators, SYSTEM |
+| `C:\Program Files\ProxmoxMCP\service` | WinSW v2.12.0 wrapper and XML | same as python |
+| `C:\Program Files\ProxmoxMCP\scripts` | Copies of `deploy\windows` for the scheduled tasks | same |
+| `C:\Program Files\ProxmoxMCP\staging` | Verified copies of artifacts during an install; deleted after | Administrators, SYSTEM only |
+| `C:\ProgramData\ProxmoxMCP` | Parent, locked before any child is created | Administrators, SYSTEM full; service traverse |
+| `...\credentials` | `enrollment.json` (plain), `*.dpapi` secrets, `worker-identity.pub`, `dpapi-entropy.bin` | Administrators, SYSTEM full; service read (per file: `audit-ship-sas` SYSTEM only, `pve-review-token` Administrators only); OWNER RIGHTS read; SACL on write, delete, ACL change and failed reads |
+| `...\logs` | `audit.jsonl`, `audit-YYYYMM.jsonl`, `audit.jsonl.lock` | Service create/append (no delete, no ACL change: OWNER RIGHTS); SYSTEM full; Administrators read; SACL on delete and ACL change |
+| `...\config` | `broker.env`, `ship.json`, `token-expiry.json` | Administrators, SYSTEM full; service read |
+| `...\evidence` | Selfcheck reports, access reviews, key escrow records (uploaded once to WORM) | Administrators, SYSTEM |
+| `...\ship` | Shipping state, immutability test results | Administrators, SYSTEM |
+| `...\cloudflared` | `tunnel-token`, logs | Administrators, SYSTEM full; cloudflared service read (logs: modify) |
 
 Service wrapper decision: WinSW v2.12.0 (`WinSW.NET461.exe`) pinned by SHA-256. Reasons:
 Python cannot answer the Service Control Manager without pywin32, which the design excludes.
@@ -139,22 +145,53 @@ Python cannot answer the Service Control Manager without pywin32, which the desi
 4.8.1, which Windows Update patches. WinSW is not Authenticode signed, so the hash pin and a
 WDAC or AppLocker hash rule are the integrity controls.
 
+Firewall program path: the venv `Scripts\python.exe` and the console-script `.exe` launchers
+start the base interpreter `C:\Program Files\ProxmoxMCP\python\python.exe`, which opens the
+sockets. The rules target that file, so they do not change when a new venv is installed.
+
+Python version: the hashed lock names its CPython version in its header; the installer enforces
+it. See docs/SECURITY.md T23 for the decision on the target line.
+
 ## 8. Configuration reference (broker.env)
 
-| Variable | Value | Notes |
+`proxmox_mcp/config.py` loads this file's variables at start (role `broker`). It refuses an
+unknown or malformed `PROXMOX_*`, `MCP_*`, `BROKER_*` or `CF_ACCESS_*` variable; booleans are
+exactly `0` or `1`. The installer writes the file and validates it with the same parser before
+the service uses it. Do not edit it by hand.
+
+| Variable | Value written | Notes |
 |---|---|---|
 | `PROXMOX_HOST`, `PROXMOX_PORT` | `<proxmox-host>`, 8006 | |
-| `PROXMOX_TLS_FINGERPRINT` or `PROXMOX_CA_BUNDLE` | SHA-256 of the PVE certificate, or a CA file | Mandatory. `PROXMOX_INSECURE_TLS` is never written. |
+| `PROXMOX_TLS_FINGERPRINT` or `PROXMOX_CA_BUNDLE` | SHA-256 of the PVE certificate, or an absolute CA file path | Mandatory. `PROXMOX_INSECURE_TLS` is never written. |
+| `PROXMOX_TIMEOUT` | 30 | seconds per Proxmox request |
+| `PROXMOX_TOTAL_TIMEOUT` | 120 | whole-request deadline, 1 to 3600 s |
 | `MCP_BIND`, `MCP_PORT` | 127.0.0.1, 8765 | Non-loopback refused unless `MCP_ALLOW_NON_LOOPBACK=1`. Never set it. |
-| `MCP_ALLOWED_HOSTS` | `broker.internal` (vpc) or `<broker-hostname>` (access) | Host header allowlist |
-| `BROKER_REQUIRE_ACCESS_JWT` | 0 (vpc) or 1 (access) | |
-| `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD` | team URL, broker app AUD | access mode; broker exits with code 2 if missing |
-| `BROKER_ALLOWED_SERVICE_CLIENT_IDS` | Worker service token client id | access mode; exit code 2 if missing |
-| `MCP_ALLOW_ADMIN_TOOLS` | 0 | 1 enables admin tier for rw users |
-| `MCP_TOOL_MODE` | dynamic | |
-| `MCP_RATE_PER_MIN`, `MCP_RATE_PER_DAY` | 60, 2000 | |
-| `MCP_REQUEST_TIMEOUT` | 120 | seconds |
-| `MCP_MAX_CONCURRENCY` | package default | |
+| `MCP_ALLOWED_HOSTS` | `broker.internal` (vpc) or `<broker-hostname>` (access) | Host header allowlist (`/healthz` is exempt) |
+| `MCP_REQUEST_TIMEOUT` | 120 | seconds per request |
+| `MCP_BODY_TIMEOUT` | 15 | seconds for the request body to arrive (slow-body defence) |
+| `MCP_HEADER_TIMEOUT` | 10 | seconds for the request head to arrive (slow-header defence) |
+| `MCP_MAX_CONCURRENCY` | 64 | |
 | `MCP_MAX_REQUEST_BYTES`, `MCP_MAX_RESULT_BYTES` | 262144, 2097152 | |
-| `MCP_ALLOW_SERVICE_TOKENS` | unset | Leave unset |
-| Fixed by the installer | `BROKER_CREDENTIALS_DIR`, `BROKER_DPAPI_ENTROPY_FILE`, `MCP_ENROLLMENT_FILE`, `MCP_AUDIT_LOG` | Paths in section 7 |
+| `MCP_RATE_PER_MIN`, `MCP_RATE_PER_DAY` | 60, 2000 | |
+| `MCP_TOOL_MODE` | dynamic | |
+| `MCP_ALLOW_ADMIN_TOOLS` | 0 | 1 (with `-AllowAdminTools`) enables the admin tier for rw users |
+| `BROKER_REQUIRE_ACCESS_JWT` | 0 (vpc) or 1 (access) | 0 is reported as a dangerous flag in the start event, by design in vpc mode |
+| `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD` | team URL, broker app AUD | access mode only |
+| `BROKER_ALLOWED_SERVICE_CLIENT_IDS` | Worker service token client id | access mode only |
+| `MCP_ALLOW_SERVICE_TOKENS` | never written | |
+
+Fixed by the installer (service XML, not broker.env):
+
+| Variable | Value |
+|---|---|
+| `BROKER_CREDENTIALS_DIR` | `C:\ProgramData\ProxmoxMCP\credentials` |
+| `BROKER_DPAPI_ENTROPY_FILE` | `...\credentials\dpapi-entropy.bin` |
+| `MCP_ENROLLMENT_FILE` | `...\credentials\enrollment.json` |
+| `MCP_AUDIT_LOG` | `C:\ProgramData\ProxmoxMCP\logs\audit.jsonl` |
+| `MCP_AUDIT_HMAC` | `required` (no key, no audit, no service) |
+| `PYTHONDONTWRITEBYTECODE`, `PYTHONNOUSERSITE`, `PYTHONUTF8` | 1 |
+
+Operator tools that read the same configuration (run through `Invoke-PmcBrokerTool`, which
+sets exactly the service environment): `proxmox-mcp-selfcheck [--live]` (exit 0 pass, 1 warn,
+2 fail, 3 crash), `proxmox-mcp-audit-verify` (0 intact, 1 integrity failure, 2 usage or I/O),
+`proxmox-mcp-protect-credential`.
