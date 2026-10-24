@@ -28,7 +28,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import hashlib
 import json
 import logging
 import os
@@ -38,6 +37,7 @@ from collections.abc import AsyncIterator
 from contextvars import ContextVar
 from typing import Any
 
+import anyio
 import httpx
 import mcp.server.stdio
 from mcp.server import Server
@@ -152,10 +152,22 @@ def _resolve_identity() -> Identity:
 # ---- helpers -------------------------------------------------------------
 
 
+RENDER_CONCURRENCY = 2
+_render_limiter_obj: anyio.CapacityLimiter | None = None
+
+
+def _render_limiter() -> anyio.CapacityLimiter:
+    global _render_limiter_obj
+    if _render_limiter_obj is None:
+        _render_limiter_obj = anyio.CapacityLimiter(RENDER_CONCURRENCY)
+    return _render_limiter_obj
+
+
 def _args_digest(args: dict[str, Any]) -> tuple[list[str], str]:
     """Argument keys and a sha256 of the canonical arguments; never the values."""
-    canonical = json.dumps(args, sort_keys=True, separators=(",", ":"), default=str)
-    return sorted(str(k) for k in args), hashlib.sha256(canonical.encode()).hexdigest()
+    # Keyed with the audit key when one is loaded: a plain sha256 of a small value (an
+    # SSN in a refused write) could be recovered from the log by enumeration.
+    return sorted(str(k) for k in args), audit.args_digest(args)
 
 
 def _audit(ident: Identity, **fields: Any) -> None:
@@ -268,7 +280,12 @@ async def _execute(tool: str, args: dict[str, Any]) -> str:
     started = time.monotonic()
     try:
         result = await module.handle(tool, args, _client())
-        text = output.render_result(result)
+        # Redaction is CPU-bound (about 1.6 s per MB). On the event loop one large read
+        # froze every other request, /healthz and the header timers; run it in a worker
+        # thread, at most RENDER_CONCURRENCY at a time.
+        text = await anyio.to_thread.run_sync(
+            output.render_result, result, limiter=_render_limiter()
+        )
     except Exception as exc:
         _audit(
             ident,

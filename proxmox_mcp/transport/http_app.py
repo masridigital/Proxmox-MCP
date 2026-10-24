@@ -599,11 +599,14 @@ def _audit_request(scope: Scope, status: int) -> None:
     if path == EXECUTE_PATH and status == 200:
         return
     notes = scope.get(AUDIT_SCOPE_KEY, {})
-    ok = status < 400
+    # status 0: the client went away before any response (never authenticated or served).
+    ok = 0 < status < 400
+    if status == 0:
+        notes = {**notes, "deny": notes.get("deny", "client disconnected")}
     fields: dict[str, Any] = {
         "side": "in",
         "event": "catalog" if path == CATALOG_PATH and ok else "http",
-        "status": "ok" if ok else "denied",
+        "status": "ok" if ok else ("aborted" if status == 0 else "denied"),
         "http": status,
         "method": scope.get("method", "")[:16],
         "path": path if path in ROUTES or path == HEALTH_PATH else "other",

@@ -93,6 +93,9 @@ from .credentials import (
 )
 from .identity import Identity, require_identity
 
+# Bodies above this parse in a worker thread (final review #1: event-loop stalls).
+_INLINE_PARSE_BYTES = 256 * 1024
+
 logger = logging.getLogger("proxmox_mcp.client")
 
 # Load .env before reading the settings below; they are read once, at import time.
@@ -669,6 +672,9 @@ class ProxmoxClient:
         if not body:
             return None
         try:
+            if len(body) > _INLINE_PARSE_BYTES:
+                # Large bodies parse in a worker thread so the event loop keeps serving.
+                return await anyio.to_thread.run_sync(json.loads, body)
             return json.loads(body)
         except ValueError:
             pass

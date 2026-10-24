@@ -53,7 +53,9 @@ CLOSE_TAG = "</untrusted-data-{nonce}>"
 NONCE_BYTES = 16
 REDACTED = "[REDACTED]"
 DEFAULT_MAX_RESULT_BYTES = 2 * 1024 * 1024
-PRECHECK_FACTOR = 4
+# Raw size above the cap is refused before any redaction: rendering never shrinks a
+# result, so redacting it first only spends CPU (a ro DoS vector, final review #1).
+PRECHECK_FACTOR = 1
 MAX_DEPTH = 64
 
 SECRET_KEY_RE = re.compile(

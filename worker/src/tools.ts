@@ -5,7 +5,7 @@
 
 import { BrokerError, type BrokerContext, type BrokerCallInfo, type Catalog, type CatalogTool, TOOL_NAME_RE, executeTool, fetchCatalog } from "./broker";
 import { redactPhi, renderBrokerResult, safeJson } from "./output";
-import { canonicalJson, cleanText, isPlainObject, sha256Hex } from "./util";
+import { cleanText, isPlainObject } from "./util";
 
 export const LIST_CAP = 50;
 export const CATALOG_TTL_MS = 60_000;
@@ -86,7 +86,6 @@ export interface ToolResult {
 export interface ToolAudit {
   target?: string;
   arg_keys?: string[];
-  args_sha256?: string;
   broker_status?: number;
   broker_jti?: string;
   catalog_version?: string;
@@ -232,11 +231,12 @@ export async function callMetaTool(name: string, rawArgs: unknown, deps: CallDep
       if (!isPlainObject(toolArgs)) throw new InputError("arguments: expected object");
       audit.target = args.name;
       audit.arg_keys = auditKeys(toolArgs);
-      audit.args_sha256 = await sha256Hex(canonicalJson(toolArgs));
     } else {
       audit.arg_keys = auditKeys(args);
-      audit.args_sha256 = await sha256Hex(canonicalJson(args));
     }
+    // No argument digest in Worker logs: an unkeyed hash of a small value (an SSN in a
+    // write the broker refuses) can be reversed by enumeration. The broker writes a
+    // keyed digest into the hash-chained audit log, correlated by jti.
   } catch (e) {
     if (e instanceof InputError) return text(`Invalid input for tool ${name}: ${e.message}`, true);
     throw e;

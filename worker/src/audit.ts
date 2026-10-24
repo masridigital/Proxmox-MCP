@@ -16,7 +16,6 @@ export interface AuditRecord {
   tool?: string;
   target?: string;
   arg_keys?: string[];
-  args_sha256?: string;
   broker_status?: number;
   broker_jti?: string;
   catalog_version?: string;

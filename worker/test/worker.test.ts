@@ -278,7 +278,7 @@ describe("audit lines", () => {
       const lines = log.mock.calls.map((c) => JSON.parse(String(c[0])) as Record<string, unknown>);
       const rec = lines.find((l) => l.event === "request")!;
       expect(rec).toMatchObject({ user: "alice@example.com", rpc: "tools/call", tool: "execute_tool", target: "get_vm_status", arg_keys: ["node", "vmid"], broker_status: 200, status: 200, is_error: false });
-      expect(rec.args_sha256).toMatch(/^[0-9a-f]{64}$/);
+      expect(rec.args_sha256).toBeUndefined(); // unkeyed digests are reversible; the broker logs a keyed one
       expect(rec.broker_jti).toMatch(/^[0-9a-f-]{36}$/);
       expect(rec.ray).toBe("8f0000000000abcd-EWR");
       expect(JSON.stringify(lines)).not.toContain("pve-secret-node");
