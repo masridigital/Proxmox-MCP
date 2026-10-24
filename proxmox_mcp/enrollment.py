@@ -43,6 +43,7 @@ import re
 import stat
 import threading
 from dataclasses import dataclass
+from datetime import date, datetime, timezone
 from typing import Any, Literal, get_args
 
 from .identity import Identity
@@ -58,6 +59,11 @@ _USERID_RE = re.compile(r"^[A-Za-z0-9._-]+@(pve|pam|[A-Za-z0-9._-]+)$")
 _CREDENTIAL_RE = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 
 _ENTRY_KEYS = frozenset({"mode", "proxmox_userid", "token_credential"})
+# token_expires: the date (UTC, YYYY-MM-DD) set with `pveum user token add --expire`.
+# Proxmox exposes it only under /access/users/*/token (denied outbound), so the operator
+# records it here; enrollment_for denies from that date on, selfcheck warns 14 days ahead.
+_OPTIONAL_KEYS = frozenset({"token_expires"})
+_DATE_RE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 _TOP_KEYS = frozenset({"users", "services"})
 
 
@@ -68,6 +74,7 @@ class Enrollment:
     proxmox_userid: str
     # Name of the systemd credential holding "tokenid=secret". Empty only for the local identity.
     token_credential: str
+    token_expires: date | None = None
 
 
 class EnrollmentError(ValueError):
@@ -87,8 +94,8 @@ def _parse_entry(subject: str, raw: Any) -> Enrollment:
     if not isinstance(raw, dict):
         raise EnrollmentError(f"{subject}: entry must be an object")
     keys = set(raw)
-    if keys != _ENTRY_KEYS:
-        extra = sorted(keys - _ENTRY_KEYS)
+    if not _ENTRY_KEYS <= keys <= _ENTRY_KEYS | _OPTIONAL_KEYS:
+        extra = sorted(keys - _ENTRY_KEYS - _OPTIONAL_KEYS)
         missing = sorted(_ENTRY_KEYS - keys)
         raise EnrollmentError(f"{subject}: unknown keys {extra}, missing keys {missing}")
 
@@ -106,7 +113,23 @@ def _parse_entry(subject: str, raw: Any) -> Enrollment:
     if not isinstance(cred, str) or not _CREDENTIAL_RE.fullmatch(cred) or cred.startswith("."):
         raise EnrollmentError(f"{subject}: token_credential must match [A-Za-z0-9_.-]{{1,64}}")
 
-    return Enrollment(subject=subject, mode=mode, proxmox_userid=userid, token_credential=cred)
+    expires = None
+    if "token_expires" in raw:
+        value = raw["token_expires"]
+        try:
+            if not isinstance(value, str) or not _DATE_RE.fullmatch(value):
+                raise ValueError
+            expires = date.fromisoformat(value)
+        except ValueError:
+            raise EnrollmentError(f"{subject}: token_expires must be YYYY-MM-DD") from None
+
+    return Enrollment(
+        subject=subject,
+        mode=mode,
+        proxmox_userid=userid,
+        token_credential=cred,
+        token_expires=expires,
+    )
 
 
 def parse_enrollments(doc: Any) -> dict[str, Enrollment]:
@@ -317,4 +340,8 @@ def enrollment_for(identity: Identity) -> Enrollment:
         found = None
     if found is None:
         raise PermissionError("not enrolled")
+    if found.token_expires is not None and datetime.now(timezone.utc).date() >= found.token_expires:
+        # Proxmox would refuse the token anyway; deny here so the reason is explicit.
+        log.error("token for %s expired on %s; rotate it", found.subject, found.token_expires)
+        raise PermissionError("token expired")
     return found

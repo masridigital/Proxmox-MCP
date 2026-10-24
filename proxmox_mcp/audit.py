@@ -224,6 +224,20 @@ def canonical_args_hash(args: Any) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+# Set when an audit log opens with a key. A plain sha256 of small arguments (a vmid, a
+# refused PHI write) can be brute-forced from the log, so argument digests are keyed
+# with the audit key when one exists; the line's ``kid`` names the key.
+_args_key: bytes | None = None
+
+
+def args_digest(args: Any) -> str:
+    """Digest of tool or API arguments for audit lines: HMAC when keyed, else sha256."""
+    canonical = json.dumps(args, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str)
+    if _args_key is None:
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return hmac.new(_args_key, b"proxmox-mcp-args-v1\0" + canonical.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
 # ---- HMAC keys -----------------------------------------------------------------------
 
 
@@ -334,7 +348,7 @@ def _clean(value: Any, depth: int = 0) -> Any:
     if isinstance(value, str):
         return _cap(_scrub_text(value))
     if isinstance(value, dict):
-        return {"keys": _safe_keys(value), "sha256": canonical_args_hash(value)}
+        return {"keys": _safe_keys(value), "sha256": args_digest(value)}
     if isinstance(value, (list, tuple, set, frozenset)):
         return [_clean(v, depth + 1) for v in list(value)[:50]]
     return _clean(str(value), depth)
@@ -351,10 +365,10 @@ def build_fields(fields: dict[str, Any]) -> dict[str, Any]:
         if isinstance(value, dict):
             keys_name, hash_name = _ARGS_FIELDS.get(key, (f"{key}_keys", f"{key}_sha256"))
             out[keys_name] = _safe_keys(value)
-            out[hash_name] = canonical_args_hash(value)
+            out[hash_name] = args_digest(value)
             continue
         if key == "args":  # non-dict args: hash only
-            out["args_sha256"] = canonical_args_hash(value)
+            out["args_sha256"] = args_digest(value)
             continue
         if key == "arg_keys" and isinstance(value, (list, tuple)):
             out[key] = _safe_keys(value)
@@ -585,8 +599,11 @@ class AuditLog:
     """Open, read head, append one line, fsync and close per event (see module doc)."""
 
     def __init__(self, path: str, key: bytes | None = None, hmac_mode: str = "auto") -> None:
+        global _args_key
         self.path = path
         self._key = key
+        if key is not None:
+            _args_key = hashlib.sha256(b"proxmox-mcp-args-key-v1\0" + key).digest()
         self._kid = key_id(key) if key is not None else None
         self._hmac_mode = hmac_mode
         self._lock = threading.Lock()

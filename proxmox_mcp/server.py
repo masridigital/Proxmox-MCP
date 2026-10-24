@@ -304,8 +304,21 @@ async def run_tool(
     """
     ident_token = current_identity.set(identity)
     ctx_token = audit_context.set(dict(correlation or {}))
+    # Correlation (jti, svc) also reaches the client's outbound lines, so an auditor can
+    # join the Worker event, the broker decision and every Proxmox call it caused.
+    bound = audit.bind(**{k: v for k, v in (correlation or {}).items() if k in ("jti", "svc")})
+    bound.__enter__()
     try:
         if not isinstance(arguments, dict):
+            _audit(
+                identity,
+                side="in",
+                rpc="execute",
+                tool="execute_tool",
+                target=tool,
+                status="denied",
+                deny="invalid input",
+            )
             return False, output.render_error(
                 f"Invalid input for tool {tool}: arguments must be an object"
             )
@@ -330,6 +343,7 @@ async def run_tool(
             log.debug("execute failure detail", exc_info=True)
         return False, output.render_error(message)
     finally:
+        bound.__exit__(None, None, None)
         audit_context.reset(ctx_token)
         current_identity.reset(ident_token)
 

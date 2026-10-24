@@ -591,7 +591,8 @@ class ProxmoxClient:
         identity = require_identity()
         record: dict[str, Any] = {
             "side": "out",
-            "kind": "proxmox",
+            "event": "proxmox",
+            "kind": identity.kind,
             "user": identity.subject,
             "ray": identity.ray_id,
             "method": method,
@@ -601,7 +602,7 @@ class ProxmoxClient:
             # Keys and a hash only: values never reach any audit sink.
             record["arg_keys"] = sorted(str(k) for k in data)
             try:
-                record["args_sha256"] = audit.canonical_args_hash(data)
+                record["args_sha256"] = audit.args_digest(data)
             except (TypeError, ValueError):
                 record["args_sha256"] = None  # unhashable keys; encode_params refuses them
         try:
@@ -619,6 +620,10 @@ class ProxmoxClient:
         except PermissionError as exc:
             audit.audit_event(**record, status="denied", deny=str(exc), ms=_ms(started))
             raise
+        if method != "GET":
+            # Write-ahead: a mutation is on record before it is sent. If this write
+            # fails (AuditError), the request never leaves the broker (fail closed).
+            audit.audit_event(**record, status="attempt", ms=_ms(started))
 
         # The header travels in a box the exchange empties, so no frame of this
         # call chain still references the secret while the request is in flight.

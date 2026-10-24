@@ -43,7 +43,7 @@ def test_wrong_pin_sends_nothing(tmp_path):
             assert body["ok"] is False
             assert "Proxmox API request failed" in body["text"]
             assert USERS["ro"].secret not in body["text"]
-            out = [x for x in audit_lines() if x.get("kind") == "proxmox"]
+            out = [x for x in audit_lines() if x.get("event") == "proxmox"]
             # httpx surfaces the pin mismatch (TLSVerificationError) as a ConnectError.
             assert [(x["status"], x["error"]) for x in out] == [("error", "ConnectError")]
     assert pve.requests == []

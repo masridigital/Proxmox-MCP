@@ -214,6 +214,14 @@ def check_bind(bind: str) -> None:
 # ---- raw ASGI helpers ---------------------------------------------------
 
 
+AUDIT_SCOPE_KEY = "proxmox_mcp.audit_notes"
+
+
+def _note(scope: Scope, **fields: Any) -> None:
+    """Record why a request was refused (or who it was) for the broker audit line."""
+    scope.setdefault(AUDIT_SCOPE_KEY, {}).update({k: v for k, v in fields.items() if v})
+
+
 def _header(scope: Scope, name: bytes) -> str | None:
     """The single value of header ``name``; None if absent. Repeats raise ValueError."""
     found: bytes | None = None
@@ -416,6 +424,7 @@ class BrokerAuth:
             assertion = _header(scope, ASSERTION_HEADER.encode())
             ray = _header(scope, b"cf-ray")
         except ValueError:
+            _note(scope, deny="repeated auth header")
             await _send_json(send, 401, {"error": "unauthorized"}, _UNAUTHORIZED_HEADERS)
             return
         ray_id = ray if ray is not None and _RAY_RE.fullmatch(ray) else None
@@ -426,16 +435,20 @@ class BrokerAuth:
                 service = await self.access_verifier.authenticate(access_token, ray_id=ray_id)
             except AccessDenied as exc:
                 log.info("access denied: %s (ray=%s)", exc.reason, ray_id)
+                _note(scope, deny=f"access jwt: {exc.reason}")
                 await _send_json(send, 401, {"error": "unauthorized"}, _UNAUTHORIZED_HEADERS)
                 return
             except AccessUnavailable:
                 log.error("access keys unavailable; refusing request (ray=%s)", ray_id)
+                _note(scope, deny="access keys unavailable")
                 await _send_json(send, 503, {"error": "unavailable"}, [(b"retry-after", b"30")])
                 return
             correlation["svc"] = service.subject
+            _note(scope, svc=service.subject)
 
         if not assertion:
             log.info("identity assertion refused: missing assertion (ray=%s)", ray_id)
+            _note(scope, deny="identity assertion missing")
             await _send_json(send, 401, {"error": "unauthorized"}, _UNAUTHORIZED_HEADERS)
             return
         try:
@@ -443,6 +456,7 @@ class BrokerAuth:
                 body = await _read_body(receive)
         except TimeoutError:
             log.info("request body not received within %ss (ray=%s)", self.body_timeout, ray_id)
+            _note(scope, deny="body timeout")
             await _send_json(send, 408, {"error": "request timeout"}, [(b"connection", b"close")])
             return
         if body is None:
@@ -454,15 +468,18 @@ class BrokerAuth:
             )
         except AssertionDenied as exc:
             log.info("identity assertion refused: %s (ray=%s)", exc.reason, ray_id)
+            _note(scope, deny=f"identity assertion: {exc.reason}")
             await _send_json(send, 401, {"error": "unauthorized"}, _UNAUTHORIZED_HEADERS)
             return
         identity = verified.identity
         correlation["jti"] = verified.jti
+        _note(scope, user=identity.subject, jti=verified.jti)
 
         try:
             self.enrollment_check(identity)
         except Exception as exc:  # PermissionError("not enrolled"), or anything else: deny
             log.info("not enrolled: %s (%s)", identity.subject, type(exc).__name__)
+            _note(scope, deny="not enrolled")
             await _send_json(send, 403, {"error": "forbidden"})
             return
 
@@ -470,6 +487,7 @@ class BrokerAuth:
             try:
                 self.request_limiter.hit(identity.subject)
             except RateLimited as exc:
+                _note(scope, deny="rate limited")
                 await _send_json(
                     send, 429, {"ok": False, "text": exc.reason}, [(b"retry-after", b"60")]
                 )
@@ -557,6 +575,52 @@ ENDPOINTS: dict[str, Endpoint] = {CATALOG_PATH: catalog_endpoint, EXECUTE_PATH: 
 # ---- top level -----------------------------------------------------------
 
 
+def _client_ip(scope: Scope) -> str | None:
+    """The caller's address as Cloudflare saw it (behind cloudflared the peer is loopback)."""
+    try:
+        raw = _header(scope, b"cf-connecting-ip")
+        return str(ipaddress.ip_address(raw)) if raw else None
+    except ValueError:
+        return None
+
+
+def _audit_request(scope: Scope, status: int) -> None:
+    """One audit line per refused request and per catalog read.
+
+    HIPAA 164.308(a)(5)(ii)(C) log-in monitoring and SOC 2 CC7.2 need failed
+    authentication in the tamper-evident log, not only in the service log. Tool
+    calls on /v1/execute are already audited by server.run_tool, and /healthz is
+    not an access event. The response has already been sent, so a failed audit
+    write cannot change it; it is logged at CRITICAL and audit.health() goes bad.
+    """
+    path = scope.get("path", "")
+    if path == HEALTH_PATH and status < 400:
+        return
+    if path == EXECUTE_PATH and status == 200:
+        return
+    notes = scope.get(AUDIT_SCOPE_KEY, {})
+    ok = status < 400
+    fields: dict[str, Any] = {
+        "side": "in",
+        "event": "catalog" if path == CATALOG_PATH and ok else "http",
+        "status": "ok" if ok else "denied",
+        "http": status,
+        "method": scope.get("method", "")[:16],
+        "path": path if path in ROUTES or path == HEALTH_PATH else "other",
+        "deny": None if ok else notes.get("deny", f"http {status}"),
+        "user": notes.get("user"),
+        "svc": notes.get("svc"),
+        "jti": notes.get("jti"),
+        "client": _client_ip(scope),
+    }
+    try:
+        from .. import audit
+
+        audit.audit_event(**{k: v for k, v in fields.items() if v is not None})
+    except Exception as exc:  # noqa: BLE001 - never mask the response already sent
+        log.critical("audit write failed for a %s response: %s", status, type(exc).__name__)
+
+
 class GuardApp:
     """Top-level ASGI app: lifespan, /healthz, and the guarded /v1 routes."""
 
@@ -592,11 +656,13 @@ class GuardApp:
             return
 
         started = False
+        status = 0
 
         async def tracking_send(message: Message) -> None:
-            nonlocal started
+            nonlocal started, status
             if message["type"] == "http.response.start":
                 started = True
+                status = int(message["status"])
             await send(message)
 
         try:
@@ -605,6 +671,9 @@ class GuardApp:
             log.error("request failed: %s", type(exc).__name__)
             if not started:
                 await _send_json(send, 500, {"error": "internal error"})
+                status = 500
+        finally:
+            _audit_request(scope, status)
 
     async def _dispatch(self, scope: Scope, receive: Receive, send: Send) -> None:
         path = scope.get("path", "")

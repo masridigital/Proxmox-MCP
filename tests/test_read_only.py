@@ -49,3 +49,23 @@ async def test_writes_allowed_for_rw_when_not_read_only(monkeypatch, proxmox):
     monkeypatch.setattr(client_mod, "PROXMOX_READ_ONLY", False)
     await c.post("/nodes/pve/qemu/100/status/start")
     assert sent == ["POST"]
+
+
+async def test_write_ahead_audit_failure_blocks_mutation(monkeypatch, proxmox):
+    """A mutation is recorded before it is sent; if that record fails, nothing is sent."""
+    c, sent, _ = proxmox
+
+    def failing(**fields):
+        if fields.get("status") == "attempt":
+            raise client_mod.audit.AuditError("disk full")
+
+    monkeypatch.setattr(client_mod.audit, "audit_event", failing)
+    with pytest.raises(client_mod.audit.AuditError):
+        await c.post("/nodes/pve/qemu/100/status/start")
+    assert sent == []
+
+
+async def test_write_ahead_line_precedes_mutation(proxmox):
+    c, sent, audited = proxmox
+    await c.post("/nodes/pve/qemu/100/status/start")
+    assert [a["status"] for a in audited] == ["attempt", 200] and sent == ["POST"]

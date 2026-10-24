@@ -80,7 +80,7 @@ def test_tool_matrix(b, tool, mode):
     seen = list(b.proxmox.requests)
     lines = audit_lines()
     tool_lines = [x for x in lines if x.get("target") == tool]
-    pve_lines = [x for x in lines if x.get("kind") == "proxmox"]
+    pve_lines = [x for x in lines if x.get("event") == "proxmox"]
     audit_text = Path(audit.configured_path()).read_text()
 
     for u in USERS.values():
@@ -108,7 +108,16 @@ def test_tool_matrix(b, tool, mode):
     for x in tool_lines:
         assert x["user"] == user.email
         assert x["svc"] == SERVICE_CLIENT_ID and x["jti"] and x["ray"] == RAY
-    for line, req in zip(pve_lines, seen, strict=True):
+    # Every mutation is on record (write-ahead "attempt") before it is sent, and every
+    # Proxmox line carries the request correlation (jti, svc) of the call that caused it.
+    attempts = [x for x in pve_lines if x["status"] == "attempt"]
+    done = [x for x in pve_lines if x["status"] != "attempt"]
+    assert [(x["method"], x["path"]) for x in attempts] == [
+        (r.method, r.path) for r in seen if r.method != "GET"
+    ]
+    for line in pve_lines:
+        assert line["kind"] == "user" and line["jti"] and line["svc"] == SERVICE_CLIENT_ID
+    for line, req in zip(done, seen, strict=True):
         assert (line["user"], line["token_id"], line["mode"]) == (user.email, user.token_id, mode)
         assert (line["method"], line["path"], line["status"]) == (req.method, req.path, 200)
     assert audit.verify_chain(audit.configured_path()) == 0

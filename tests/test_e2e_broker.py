@@ -177,7 +177,7 @@ def test_phi_in_a_write_is_refused_before_proxmox(b):
     )
     assert r.json()["ok"] is False and "possible PHI detected (dob)" in r.json()["text"]
     assert b.proxmox.requests == []
-    out = [x for x in audit_lines() if x.get("kind") == "proxmox"]
+    out = [x for x in audit_lines() if x.get("event") == "proxmox"]
     assert [(x["status"], x["deny"]) for x in out] == [("denied", "possible PHI detected (dob)")]
     assert "1960" not in json.dumps(audit_lines())
 
