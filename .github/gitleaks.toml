@@ -1,0 +1,16 @@
+# gitleaks configuration for CI (.github/workflows/ci.yml passes --config).
+# Default rules plus a narrow, per-file allowlist. Every entry must name one file that holds
+# deliberately public test material and say why; never allowlist a directory or a rule.
+title = "proxmox-mcp gitleaks config"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Published test vectors: keys and tokens that are public by design and never deployed"
+paths = [
+  # Ed25519 cross-implementation vector for X-MCP-Identity; the file is marked TEST ONLY.
+  '''^worker/test/fixtures/assertion-vector\.json$''',
+  # Fake bearer/JWT/token strings the audit-redaction tests assert never reach a log line.
+  '''^tests/test_h5_content\.py$''',
+]

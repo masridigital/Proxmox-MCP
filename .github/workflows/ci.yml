@@ -1,0 +1,321 @@
+# Python CI for the broker package (SOC 2 CC8.1 change management, CC7.1 vulnerability
+# management; HIPAA 164.308(a)(1) risk management).
+#
+# Every action is pinned to a full commit SHA (version in the trailing comment) and bumped by
+# Dependabot. Third-party binaries are downloaded by exact version and verified by SHA-256.
+# The workflow token has no permissions by default; each job asks for the least it needs.
+# There is deliberately no pull_request_target trigger: fork PRs run with a read-only token
+# and no secrets.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  merge_group:
+  schedule:
+    # Weekly re-audit of the locked set, so an advisory published after merge still surfaces.
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  UV_VERSION: "0.11.32"
+  PYTHON_VERSION: "3.12"
+  GITLEAKS_VERSION: "8.30.1"
+  GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+  ACTIONLINT_VERSION: "1.7.12"
+  ACTIONLINT_SHA256: "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PYTHONDONTWRITEBYTECODE: "1"
+
+jobs:
+  lint:
+    name: Lint (ruff, lock drift, actionlint)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: false
+
+      - name: Lock matches pyproject.toml
+        run: uv lock --check
+
+      - name: Install locked dev environment
+        run: uv sync --frozen
+
+      - name: ruff check (includes flake8-bandit S rules)
+        run: uv run --frozen ruff check --output-format=github .
+
+      - name: ruff format --check
+        run: uv run --frozen ruff format --check .
+
+      - name: Broker lock matches uv.lock
+        run: uv run --frozen python requirements/generate_broker_lock.py --check
+
+      - name: actionlint
+        run: |
+          set -euo pipefail
+          tarball="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSLo "$RUNNER_TEMP/$tarball" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/$tarball"
+          echo "${ACTIONLINT_SHA256}  $RUNNER_TEMP/$tarball" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$tarball" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" -color
+
+  test:
+    name: Tests (Python ${{ matrix.python }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    # The Windows leg is informational until the Windows credential/ACL work lands; make it a
+    # required check (and drop continue-on-error) once it is green.
+    continue-on-error: ${{ matrix.experimental }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-24.04, python: "3.10", experimental: false }
+          - { os: ubuntu-24.04, python: "3.12", experimental: false }
+          - { os: windows-2025, python: "3.12", experimental: true }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ matrix.python }}
+          enable-cache: false
+
+      - name: Install locked dev environment
+        run: uv sync --frozen
+
+      # The coverage floor is [tool.coverage.report] fail_under in pyproject.toml.
+      - name: pytest with coverage gate
+        run: uv run --frozen pytest -q --cov-report=xml --cov-report=term
+
+      - name: Upload coverage report
+        if: always() && matrix.os == 'ubuntu-24.04' && matrix.python == '3.12'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-xml
+          path: coverage.xml
+          retention-days: 30
+          if-no-files-found: error
+
+  audit:
+    name: Dependency audit (pip-audit)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: false
+
+      - name: Install hashed CI toolchain
+        run: |
+          python -m venv "$RUNNER_TEMP/tools"
+          "$RUNNER_TEMP/tools/bin/python" -m pip install --require-hashes --only-binary :all: \
+            -r requirements/ci-tools.txt
+
+      - name: Export the full locked set (runtime + dev)
+        run: uv export --frozen --all-groups --no-emit-project -o "$RUNNER_TEMP/locked-all.txt"
+
+      # --disable-pip audits the pinned, hashed versions as written; nothing is installed.
+      - name: pip-audit broker runtime lock
+        run: |
+          "$RUNNER_TEMP/tools/bin/pip-audit" --strict --require-hashes --disable-pip \
+            --desc on -r requirements/broker-win.txt
+
+      - name: pip-audit full uv.lock (runtime + dev)
+        run: |
+          "$RUNNER_TEMP/tools/bin/pip-audit" --strict --require-hashes --disable-pip \
+            --desc on -r "$RUNNER_TEMP/locked-all.txt"
+
+      - name: pip-audit CI toolchain
+        run: |
+          "$RUNNER_TEMP/tools/bin/pip-audit" --strict --require-hashes --disable-pip \
+            --desc on -r requirements/ci-tools.txt
+
+  secrets:
+    name: Secret scan (gitleaks, full history)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install gitleaks (pinned, SHA-256 verified)
+        run: |
+          set -euo pipefail
+          tarball="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSLo "$RUNNER_TEMP/$tarball" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/$tarball"
+          echo "${GITLEAKS_SHA256}  $RUNNER_TEMP/$tarball" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$tarball" -C "$RUNNER_TEMP" gitleaks
+
+      - name: gitleaks (git history)
+        run: '"$RUNNER_TEMP/gitleaks" git --config .github/gitleaks.toml --redact --no-banner --exit-code 1 --verbose .'
+
+      - name: gitleaks (working tree, including untracked build inputs)
+        run: '"$RUNNER_TEMP/gitleaks" dir --config .github/gitleaks.toml --redact --no-banner --exit-code 1 .'
+
+  build:
+    name: Build wheel + SHA256SUMS + SBOM
+    needs: [lint, test, audit, secrets]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install hashed CI toolchain
+        run: |
+          python -m venv "$RUNNER_TEMP/tools"
+          "$RUNNER_TEMP/tools/bin/python" -m pip install --require-hashes --only-binary :all: \
+            -r requirements/ci-tools.txt
+
+      # No build isolation: the backend (hatchling) comes from the hashed toolchain above,
+      # not from an unpinned download. SOURCE_DATE_EPOCH makes the wheel byte-reproducible.
+      - name: Build wheel
+        run: |
+          set -euo pipefail
+          SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)"
+          export SOURCE_DATE_EPOCH
+          "$RUNNER_TEMP/tools/bin/python" -m build --wheel --no-isolation --outdir dist .
+
+      - name: Install exactly as the Windows installer does (hashed lock, then wheel)
+        run: |
+          set -euo pipefail
+          python -m venv "$RUNNER_TEMP/broker"
+          "$RUNNER_TEMP/broker/bin/python" -m pip install --require-hashes --no-deps \
+            -r requirements/broker-win.txt
+          "$RUNNER_TEMP/broker/bin/python" -m pip install --no-deps dist/*.whl
+          "$RUNNER_TEMP/broker/bin/python" -m pip check
+          "$RUNNER_TEMP/broker/bin/python" -c "import proxmox_mcp.transport.http_app"
+
+      - name: SBOM (CycloneDX JSON) of the installed broker environment
+        run: |
+          "$RUNNER_TEMP/tools/bin/cyclonedx-py" environment \
+            --pyproject pyproject.toml --mc-type application \
+            --of JSON --output-reproducible --validate \
+            -o dist/proxmox-mcp-broker.cdx.json \
+            "$RUNNER_TEMP/broker/bin/python"
+
+      - name: SHA256SUMS
+        run: |
+          set -euo pipefail
+          cp requirements/broker-win.txt dist/
+          cd dist
+          sha256sum -- * > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Upload broker artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: broker-dist
+          path: dist/
+          retention-days: 90
+          if-no-files-found: error
+
+  install-windows:
+    name: Broker install check (Windows Server 2025)
+    needs: [build]
+    runs-on: windows-2025
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          architecture: x64
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: broker-dist
+          path: dist
+
+      - name: Verify SHA256SUMS and install with --require-hashes
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Set-Location dist
+          foreach ($line in Get-Content SHA256SUMS) {
+            $expected, $name = $line -split '\s+\*?', 2
+            $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $name).Hash.ToLowerInvariant()
+            if ($actual -ne $expected) { throw "SHA-256 mismatch for $name" }
+          }
+          python -m venv "$env:RUNNER_TEMP\broker"
+          $py = "$env:RUNNER_TEMP\broker\Scripts\python.exe"
+          & $py -m pip install --require-hashes --no-deps -r broker-win.txt
+          if ($LASTEXITCODE) { throw "locked dependency install failed" }
+          $wheel = (Get-ChildItem -Filter *.whl).FullName
+          & $py -m pip install --no-deps $wheel
+          if ($LASTEXITCODE) { throw "wheel install failed" }
+          & $py -m pip check
+          if ($LASTEXITCODE) { throw "pip check failed" }
+          & $py -c "import proxmox_mcp.transport.http_app"
+          if ($LASTEXITCODE) { throw "import failed" }
+
+  provenance:
+    name: Build provenance attestation
+    # Only for commits that landed on main; never for PRs.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [build, install-windows]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: broker-dist
+          path: dist
+
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-checksums: dist/SHA256SUMS

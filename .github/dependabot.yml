@@ -1,31 +1,98 @@
+# Dependency update automation (SOC 2 CC7.1 / CC8.1). Every update arrives as a PR and goes
+# through the same required checks and review as any other change.
+#
+# Security updates are not delayed: `cooldown` applies to version updates only. Version updates
+# wait 7 days after a release, matching [tool.uv] exclude-newer in pyproject.toml, so a
+# hijacked release is usually yanked before it can be proposed.
 version: 2
 updates:
-  # Python dependencies (pip/pyproject.toml)
-  - package-ecosystem: "pip"
+  # Python: pyproject.toml + uv.lock. After merging a uv.lock change, regenerate
+  # requirements/broker-win.txt (python requirements/generate_broker_lock.py); the CI
+  # "Broker lock matches uv.lock" step fails until that is done.
+  - package-ecosystem: "uv"
     directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
       time: "09:00"
+      timezone: "Etc/UTC"
     open-pull-requests-limit: 10
-    labels:
-      - "dependencies"
-      - "security"
+    cooldown:
+      default-days: 7
+    labels: ["dependencies", "python"]
     commit-message:
-      prefix: "chore"
+      prefix: "deps"
       include: "scope"
+    groups:
+      python-runtime:
+        dependency-type: "production"
+        update-types: ["minor", "patch"]
+      python-dev:
+        dependency-type: "development"
+        update-types: ["minor", "patch"]
     ignore:
       # mcp 2.x removed the @app.list_tools()/@app.call_tool() decorators server.py uses.
-      # Moving to 2.x is a code change, not a version bump (see #28, which broke startup).
+      # Moving to 2.x is a code change, not a version bump.
       - dependency-name: "mcp"
         update-types: ["version-update:semver-major"]
 
-  # GitHub Actions
+  # CI-only toolchain (pip-audit, cyclonedx-bom, build, hatchling), hashed.
+  # broker-win.txt is generated from uv.lock and must never be edited directly.
+  - package-ecosystem: "pip"
+    directory: "/requirements"
+    exclude-paths:
+      - "requirements/broker-win.txt"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 5
+    cooldown:
+      default-days: 7
+    labels: ["dependencies", "ci"]
+    commit-message:
+      prefix: "deps(ci)"
+    groups:
+      ci-tools:
+        patterns: ["*"]
+
+  # Cloudflare Worker (TypeScript).
+  - package-ecosystem: "npm"
+    directory: "/worker"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 10
+    cooldown:
+      default-days: 7
+    labels: ["dependencies", "worker"]
+    commit-message:
+      prefix: "deps(worker)"
+    groups:
+      worker-runtime:
+        dependency-type: "production"
+        update-types: ["minor", "patch"]
+      worker-dev:
+        dependency-type: "development"
+        update-types: ["minor", "patch"]
+
+  # GitHub Actions (SHA pins; Dependabot rewrites the SHA and the version comment together).
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "monthly"
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Etc/UTC"
     open-pull-requests-limit: 5
-    labels:
-      - "dependencies"
-      - "github-actions"
+    cooldown:
+      default-days: 7
+    labels: ["dependencies", "github-actions"]
+    commit-message:
+      prefix: "deps(actions)"
+    groups:
+      github-actions:
+        patterns: ["*"]

@@ -1,0 +1,23 @@
+# Code owners (SOC 2 CC8.1). With branch protection "Require review from Code Owners", every
+# change below needs an approving review from the security team. The last matching pattern
+# wins, so the default rule comes first and the stricter paths after it.
+
+*                           @masridigital/security
+
+# Change-management and supply-chain controls.
+/.github/                   @masridigital/security
+/pyproject.toml             @masridigital/security
+/uv.lock                    @masridigital/security
+/requirements/              @masridigital/security
+
+# Trust boundary: identity, authorization, credentials, audit, PHI filtering.
+/proxmox_mcp/transport/     @masridigital/security
+/proxmox_mcp/credentials.py @masridigital/security
+/proxmox_mcp/enrollment.py  @masridigital/security
+/proxmox_mcp/identity.py    @masridigital/security
+/proxmox_mcp/policy.py      @masridigital/security
+/proxmox_mcp/audit.py       @masridigital/security
+/proxmox_mcp/phi.py         @masridigital/security
+/proxmox_mcp/output.py      @masridigital/security
+/worker/                    @masridigital/security
+/deploy/                    @masridigital/security
