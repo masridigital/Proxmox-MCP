@@ -16,8 +16,14 @@ CT_CREATE = {"node": "pve01", "vmid": 200, "ostemplate": "local:vztmpl/debian.ta
 
 @pytest.fixture(autouse=True)
 def _env(monkeypatch):
-    for var in ("MCP_ALLOW_ADMIN_TOOLS", "MCP_TOOL_DENY", "MCP_TOOL_ALLOW", "MCP_ENROLLMENT_FILE",
-                "CREDENTIALS_DIRECTORY", "BROKER_CREDENTIALS_DIR"):
+    for var in (
+        "MCP_ALLOW_ADMIN_TOOLS",
+        "MCP_TOOL_DENY",
+        "MCP_TOOL_ALLOW",
+        "MCP_ENROLLMENT_FILE",
+        "CREDENTIALS_DIRECTORY",
+        "BROKER_CREDENTIALS_DIR",
+    ):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setenv("MCP_LOCAL_MODE", "rw")
     monkeypatch.setenv("MCP_ALLOW_ADMIN_TOOLS", "1")
@@ -87,8 +93,15 @@ def test_control_characters_refused_in_config_values(key):
 
 def test_multiline_allowed_where_legitimate():
     validate_arguments("set_vm_config", {**VM, "description": "line one\nline two"})
-    validate_arguments("deploy_cloud_vms", {"node": "pve01", "names": ["a1"], "image": "local:import/x.qcow2",
-                                            "ssh_public_keys": "ssh-ed25519 AAAA a\nssh-ed25519 BBBB b"})
+    validate_arguments(
+        "deploy_cloud_vms",
+        {
+            "node": "pve01",
+            "names": ["a1"],
+            "image": "local:import/x.qcow2",
+            "ssh_public_keys": "ssh-ed25519 AAAA a\nssh-ed25519 BBBB b",
+        },
+    )
 
 
 # ----------------------------------------------------------------------------- nesting / DoS
@@ -104,10 +117,14 @@ def _deep(n):
 async def test_execute_tool_deep_nesting_is_refused_without_recursion(as_local):
     ex = _Exec()
     with pytest.raises(RouterError):
-        await handle_meta("execute_tool", {"name": "list_vms", "arguments": {"node": _deep(5000)}}, ex)
+        await handle_meta(
+            "execute_tool", {"name": "list_vms", "arguments": {"node": _deep(5000)}}, ex
+        )
     # Hidden tools also go through the structural guard before reaching execute.
     with pytest.raises(RouterError):
-        await handle_meta("execute_tool", {"name": "vm_agent_exec", "arguments": {"x": _deep(5000)}}, ex)
+        await handle_meta(
+            "execute_tool", {"name": "vm_agent_exec", "arguments": {"x": _deep(5000)}}, ex
+        )
     assert ex.calls == []
 
 
@@ -122,17 +139,30 @@ async def test_execute_tool_huge_argument_fanout_refused(as_local):
 async def test_execute_tool_accepts_array_arguments(as_local):
     # Dynamic mode must not reject a tool whose schema has arrays (deploy_cloud_vms).
     ex = _Exec()
-    args = {"node": "pve01", "names": ["a1"], "image": "local:import/x.qcow2", "ssh_public_keys": "ssh-ed25519 A"}
-    assert await handle_meta("execute_tool", {"name": "deploy_cloud_vms", "arguments": args}, ex) == "ok"
+    args = {
+        "node": "pve01",
+        "names": ["a1"],
+        "image": "local:import/x.qcow2",
+        "ssh_public_keys": "ssh-ed25519 A",
+    }
+    assert (
+        await handle_meta("execute_tool", {"name": "deploy_cloud_vms", "arguments": args}, ex)
+        == "ok"
+    )
 
 
 async def test_execute_tool_nested_object_in_arguments_still_validated(as_local):
     ex = _Exec()
     with pytest.raises(RouterError, match="expected string"):
-        await handle_meta("execute_tool", {"name": "get_node_status", "arguments": {"node": {"a": 1}}}, ex)
+        await handle_meta(
+            "execute_tool", {"name": "get_node_status", "arguments": {"node": {"a": 1}}}, ex
+        )
     with pytest.raises(RouterError, match="must be a string, number or boolean"):
-        await handle_meta("execute_tool", {"name": "create_vm",
-                                           "arguments": {"node": "pve01", "extra_config": {"a": [1]}}}, ex)
+        await handle_meta(
+            "execute_tool",
+            {"name": "create_vm", "arguments": {"node": "pve01", "extra_config": {"a": [1]}}},
+            ex,
+        )
     assert ex.calls == []
 
 
@@ -144,8 +174,23 @@ def test_unsupported_schema_combinators_fail_closed():
 
 
 def test_no_tool_schema_uses_unsupported_keywords():
-    allowed = {"type", "properties", "required", "description", "items", "enum", "additionalProperties",
-               "minimum", "maximum", "maxLength", "minLength", "pattern", "maxItems", "minItems", "default"}
+    allowed = {
+        "type",
+        "properties",
+        "required",
+        "description",
+        "items",
+        "enum",
+        "additionalProperties",
+        "minimum",
+        "maximum",
+        "maxLength",
+        "minLength",
+        "pattern",
+        "maxItems",
+        "minItems",
+        "default",
+    }
 
     def walk(schema, where):
         bad = set(schema) - allowed
@@ -200,19 +245,35 @@ def test_extra_config_host_access_refused(extra):
 
 
 def test_extra_config_benign_keys_allowed():
-    validate_arguments("create_vm", {"node": "pve01", "vmid": 100, "extra_config": {
-        "net4": "virtio,bridge=vmbr1", "ciuser": "ubuntu", "ipconfig0": "ip=dhcp", "serial0": "socket",
-        "scsi2": "local-lvm:8", "efidisk0": "local-lvm:1,efitype=4m", "balloon": 0}})
+    validate_arguments(
+        "create_vm",
+        {
+            "node": "pve01",
+            "vmid": 100,
+            "extra_config": {
+                "net4": "virtio,bridge=vmbr1",
+                "ciuser": "ubuntu",
+                "ipconfig0": "ip=dhcp",
+                "serial0": "socket",
+                "scsi2": "local-lvm:8",
+                "efidisk0": "local-lvm:1,efitype=4m",
+                "balloon": 0,
+            },
+        },
+    )
 
 
-@pytest.mark.parametrize("key,value", [
-    ("scsi0", "/dev/sda"),
-    ("scsi0", "local-lvm:0,import-from=/dev/sda"),
-    ("ide2", "/root/x.iso,media=cdrom"),
-    ("ide2", "cdrom"),
-    ("serial0", "/dev/ttyS0"),
-    ("scsi1", "volume=/dev/sdb"),
-])
+@pytest.mark.parametrize(
+    "key,value",
+    [
+        ("scsi0", "/dev/sda"),
+        ("scsi0", "local-lvm:0,import-from=/dev/sda"),
+        ("ide2", "/root/x.iso,media=cdrom"),
+        ("ide2", "cdrom"),
+        ("serial0", "/dev/ttyS0"),
+        ("scsi1", "volume=/dev/sdb"),
+    ],
+)
 def test_create_vm_top_level_host_devices_refused(key, value):
     with pytest.raises(ValueError):
         validate_arguments("create_vm", {"node": "pve01", "vmid": 100, key: value})
@@ -226,68 +287,126 @@ def test_set_vm_config_host_devices_refused():
     validate_arguments("set_vm_config", {**VM, "ide2": "none,media=cdrom"})
 
 
-@pytest.mark.parametrize("tool,args", [
-    ("create_container", {**CT_CREATE, "unprivileged": False}),
-    ("create_container", {**CT_CREATE, "rootfs": "/srv/rootfs"}),
-    ("create_container", {**CT_CREATE, "features": "mount=nfs"}),
-    ("create_container", {**CT_CREATE, "ostemplate": "/var/lib/vz/template/x.tar.zst"}),
-    ("set_container_config", {**VM, "mp0": "/srv/host,mp=/data"}),
-    ("set_container_config", {**VM, "mp0": "volume=/srv/host,mp=/data"}),
-    ("set_container_config", {**VM, "unprivileged": False}),
-    ("set_container_config", {**VM, "features": "nesting=1,mount=cifs"}),
-    ("restore_container_backup", {"node": "pve01", "vmid": 200, "ostemplate": "local:backup/x.tar.zst",
-                                  "unprivileged": False}),
-    ("restore_vm_backup", {"node": "pve01", "vmid": 200, "archive": "/var/lib/vz/dump/x.vma.zst"}),
-    ("import_vm_disk", {**VM, "source": "/dev/sda", "storage": "local-lvm"}),
-    ("import_vm_disk", {**VM, "source": "local:import/x.qcow2", "storage": "local-lvm", "disk": "args"}),
-    ("import_vm_disk", {**VM, "source": "local:import/x.qcow2", "storage": "local-lvm", "disk": "hookscript"}),
-    ("import_vm_disk", {**VM, "source": "local:import/x.qcow2", "storage": "local-lvm",
-                        "options": "discard=on,file=/dev/sda"}),
-    ("import_vm_disk", {**VM, "source": "local:import/x.qcow2,file=/dev/sda", "storage": "local-lvm"}),
-    ("import_vm_disk", {**VM, "source": "local:import/x.qcow2", "storage": "local-lvm:0,import-from=/dev/sda"}),
-    ("set_cluster_options", {"migration_type": "insecure"}),
-    ("migrate_vm", {**VM, "target": "pve02", "migration_type": "insecure"}),
-])
+@pytest.mark.parametrize(
+    "tool,args",
+    [
+        ("create_container", {**CT_CREATE, "unprivileged": False}),
+        ("create_container", {**CT_CREATE, "rootfs": "/srv/rootfs"}),
+        ("create_container", {**CT_CREATE, "features": "mount=nfs"}),
+        ("create_container", {**CT_CREATE, "ostemplate": "/var/lib/vz/template/x.tar.zst"}),
+        ("set_container_config", {**VM, "mp0": "/srv/host,mp=/data"}),
+        ("set_container_config", {**VM, "mp0": "volume=/srv/host,mp=/data"}),
+        ("set_container_config", {**VM, "unprivileged": False}),
+        ("set_container_config", {**VM, "features": "nesting=1,mount=cifs"}),
+        (
+            "restore_container_backup",
+            {
+                "node": "pve01",
+                "vmid": 200,
+                "ostemplate": "local:backup/x.tar.zst",
+                "unprivileged": False,
+            },
+        ),
+        (
+            "restore_vm_backup",
+            {"node": "pve01", "vmid": 200, "archive": "/var/lib/vz/dump/x.vma.zst"},
+        ),
+        ("import_vm_disk", {**VM, "source": "/dev/sda", "storage": "local-lvm"}),
+        (
+            "import_vm_disk",
+            {**VM, "source": "local:import/x.qcow2", "storage": "local-lvm", "disk": "args"},
+        ),
+        (
+            "import_vm_disk",
+            {**VM, "source": "local:import/x.qcow2", "storage": "local-lvm", "disk": "hookscript"},
+        ),
+        (
+            "import_vm_disk",
+            {
+                **VM,
+                "source": "local:import/x.qcow2",
+                "storage": "local-lvm",
+                "options": "discard=on,file=/dev/sda",
+            },
+        ),
+        (
+            "import_vm_disk",
+            {**VM, "source": "local:import/x.qcow2,file=/dev/sda", "storage": "local-lvm"},
+        ),
+        (
+            "import_vm_disk",
+            {**VM, "source": "local:import/x.qcow2", "storage": "local-lvm:0,import-from=/dev/sda"},
+        ),
+        ("set_cluster_options", {"migration_type": "insecure"}),
+        ("migrate_vm", {**VM, "target": "pve02", "migration_type": "insecure"}),
+    ],
+)
 def test_host_access_and_downgrades_refused(tool, args):
     with pytest.raises(ValueError):
         validate_arguments(tool, args)
 
 
 def test_container_benign_config_allowed():
-    validate_arguments("create_container", {**CT_CREATE, "unprivileged": True, "features": "nesting=1,keyctl=1",
-                                            "rootfs": "local-lvm:8"})
+    validate_arguments(
+        "create_container",
+        {
+            **CT_CREATE,
+            "unprivileged": True,
+            "features": "nesting=1,keyctl=1",
+            "rootfs": "local-lvm:8",
+        },
+    )
     validate_arguments("set_container_config", {**VM, "mp0": "local-lvm:10,mp=/data"})
-    validate_arguments("import_vm_disk", {**VM, "source": "local:import/x.qcow2", "storage": "local-lvm",
-                                          "disk": "scsi1", "options": "discard=on,ssd=1"})
+    validate_arguments(
+        "import_vm_disk",
+        {
+            **VM,
+            "source": "local:import/x.qcow2",
+            "storage": "local-lvm",
+            "disk": "scsi1",
+            "options": "discard=on,ssd=1",
+        },
+    )
 
 
-@pytest.mark.parametrize("key,value", [
-    ("disk_storage", "local-lvm:0,import-from=/dev/sda,x"),
-    ("bridge", "vmbr0,firewall=0"),
-    ("image", "local:import/x.qcow2,discard=on"),
-    ("image", "/dev/sda"),
-    ("names", ["ok1", "bad,name"]),
-    ("ip_addresses", ["fe80::1%a,gw=192.0.2.1/64"]),
-    ("ciuser", "root\nx"),
-    ("nameserver", "192.0.2.1,x=y"),
-    ("tags", "a,b=c"),
-])
+@pytest.mark.parametrize(
+    "key,value",
+    [
+        ("disk_storage", "local-lvm:0,import-from=/dev/sda,x"),
+        ("bridge", "vmbr0,firewall=0"),
+        ("image", "local:import/x.qcow2,discard=on"),
+        ("image", "/dev/sda"),
+        ("names", ["ok1", "bad,name"]),
+        ("ip_addresses", ["fe80::1%a,gw=192.0.2.1/64"]),
+        ("ciuser", "root\nx"),
+        ("nameserver", "192.0.2.1,x=y"),
+        ("tags", "a,b=c"),
+    ],
+)
 def test_deploy_cloud_vms_property_string_injection_refused(key, value):
-    base = {"node": "pve01", "names": ["vm1"], "image": "local:import/x.qcow2", "ssh_public_keys": "ssh-ed25519 A"}
+    base = {
+        "node": "pve01",
+        "names": ["vm1"],
+        "image": "local:import/x.qcow2",
+        "ssh_public_keys": "ssh-ed25519 A",
+    }
     if key == "ip_addresses":
         base["names"] = ["vm1"]
     with pytest.raises(ValueError):
         validate_arguments("deploy_cloud_vms", {**base, key: value})
 
 
-@pytest.mark.parametrize("key,value", [
-    ("disk_storage", "local-lvm:0,import-from=/dev/sda"),
-    ("wan_bridge", "vmbr0,link_down=1"),
-    ("lan_bridge", "vmbr1,tag=5"),
-    ("extra_nics", ["vmbr1:160,firewall=0"]),
-    ("extra_nics", ["vmbr1:x"]),
-    ("image", "/dev/sda"),
-])
+@pytest.mark.parametrize(
+    "key,value",
+    [
+        ("disk_storage", "local-lvm:0,import-from=/dev/sda"),
+        ("wan_bridge", "vmbr0,link_down=1"),
+        ("lan_bridge", "vmbr1,tag=5"),
+        ("extra_nics", ["vmbr1:160,firewall=0"]),
+        ("extra_nics", ["vmbr1:x"]),
+        ("image", "/dev/sda"),
+    ],
+)
 def test_deploy_fortigate_property_string_injection_refused(key, value):
     base = {"node": "pve01", "image": "local:import/fortios.qcow2"}
     with pytest.raises(ValueError):
@@ -295,20 +414,45 @@ def test_deploy_fortigate_property_string_injection_refused(key, value):
 
 
 def test_deploy_benign_values_allowed():
-    validate_arguments("deploy_fortigate_vm", {"node": "pve01", "image": "local:import/fortios.qcow2",
-                                               "wan_bridge": "vmbr0", "lan_bridge": "vmbr1",
-                                               "extra_nics": ["vmbr2", "vmbr3:160"], "disk_storage": "local-lvm"})
-    validate_arguments("deploy_cloud_vms", {"node": "pve01", "names": ["k3s-1", "k3s-2"],
-                                            "image": "local:import/noble.qcow2", "ssh_public_keys": "ssh-ed25519 A",
-                                            "ip_addresses": ["192.0.2.21/24", "2001:db8::5/64"],
-                                            "gateway": "192.0.2.1", "nameserver": "192.0.2.53 192.0.2.54",
-                                            "searchdomain": "example.internal", "ciuser": "ubuntu",
-                                            "tags": "k3s;test", "bridge": "vmbr0", "disk_storage": "local-lvm"})
+    validate_arguments(
+        "deploy_fortigate_vm",
+        {
+            "node": "pve01",
+            "image": "local:import/fortios.qcow2",
+            "wan_bridge": "vmbr0",
+            "lan_bridge": "vmbr1",
+            "extra_nics": ["vmbr2", "vmbr3:160"],
+            "disk_storage": "local-lvm",
+        },
+    )
+    validate_arguments(
+        "deploy_cloud_vms",
+        {
+            "node": "pve01",
+            "names": ["k3s-1", "k3s-2"],
+            "image": "local:import/noble.qcow2",
+            "ssh_public_keys": "ssh-ed25519 A",
+            "ip_addresses": ["192.0.2.21/24", "2001:db8::5/64"],
+            "gateway": "192.0.2.1",
+            "nameserver": "192.0.2.53 192.0.2.54",
+            "searchdomain": "example.internal",
+            "ciuser": "ubuntu",
+            "tags": "k3s;test",
+            "bridge": "vmbr0",
+            "disk_storage": "local-lvm",
+        },
+    )
 
 
 def test_acme_tos_directory_is_not_an_ssrf_primitive():
-    validate_arguments("get_acme_tos", {"directory": "https://acme-v02.api.letsencrypt.org/directory"})
-    for bad in ("http://192.0.2.1:8080/", "https://169.254.169.254/latest", "file:///etc/passwd",
-                "https://acme-v02.api.letsencrypt.org.evil.example/directory"):
+    validate_arguments(
+        "get_acme_tos", {"directory": "https://acme-v02.api.letsencrypt.org/directory"}
+    )
+    for bad in (
+        "http://192.0.2.1:8080/",
+        "https://169.254.169.254/latest",
+        "file:///etc/passwd",
+        "https://acme-v02.api.letsencrypt.org.evil.example/directory",
+    ):
         with pytest.raises(ValueError):
             validate_arguments("get_acme_tos", {"directory": bad})

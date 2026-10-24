@@ -15,8 +15,15 @@ from proxmox_mcp.router import RouterError, handle_meta
 
 @pytest.fixture(autouse=True)
 def _env(monkeypatch):
-    for var in ("MCP_ALLOW_ADMIN_TOOLS", "MCP_TOOL_DENY", "MCP_TOOL_ALLOW", "MCP_ENROLLMENT_FILE",
-                "CREDENTIALS_DIRECTORY", "BROKER_CREDENTIALS_DIR", "MCP_LOCAL_MODE"):
+    for var in (
+        "MCP_ALLOW_ADMIN_TOOLS",
+        "MCP_TOOL_DENY",
+        "MCP_TOOL_ALLOW",
+        "MCP_ENROLLMENT_FILE",
+        "CREDENTIALS_DIRECTORY",
+        "BROKER_CREDENTIALS_DIR",
+        "MCP_LOCAL_MODE",
+    ):
         monkeypatch.delenv(var, raising=False)
 
 
@@ -26,8 +33,13 @@ def _env(monkeypatch):
 # Bulk host logs and per-connection firewall logs: raw, unfiltered, host-wide (not scoped by
 # the caller's pool ACL), and they carry HIPAA identifiers (client IP addresses, user names).
 # Minimum necessary: not for read-only users; a rw admin may pull them deliberately.
-ADMIN_ONLY_READS = ["get_node_syslog", "get_node_journal", "get_vm_firewall_log",
-                    "get_node_firewall_log", "get_cluster_firewall_log"]
+ADMIN_ONLY_READS = [
+    "get_node_syslog",
+    "get_node_journal",
+    "get_vm_firewall_log",
+    "get_node_firewall_log",
+    "get_cluster_firewall_log",
+]
 
 
 @pytest.mark.parametrize("name", ADMIN_ONLY_READS)
@@ -125,8 +137,12 @@ async def test_summary_hides_forbidden_examples(as_local, monkeypatch):
 
 
 async def test_describe_probe_of_hidden_equals_unknown_in_batch(as_local):
-    a = await handle_meta("describe_tool_input", {"tool_names": ["list_vms", "vm_agent_exec"]}, _Exec())
-    b = await handle_meta("describe_tool_input", {"tool_names": ["list_vms", "vm_agent_exex"]}, _Exec())
+    a = await handle_meta(
+        "describe_tool_input", {"tool_names": ["list_vms", "vm_agent_exec"]}, _Exec()
+    )
+    b = await handle_meta(
+        "describe_tool_input", {"tool_names": ["list_vms", "vm_agent_exex"]}, _Exec()
+    )
     assert a.replace("vm_agent_exec", "X") == b.replace("vm_agent_exex", "X")
 
 
@@ -174,16 +190,22 @@ def _user(email):
     return Identity(subject=email, kind="user", email=email)
 
 
-@pytest.mark.parametrize("email", [
-    "Kate@example.com",  # KELVIN SIGN lowercases to ASCII "k"
-    "KATE@EXAMPLE.COṀ",
-    "kate＠example.com",  # fullwidth @
-    "kate@example.com\n",
-    " kate@example.com",
-    "kate@examplе.com",  # Cyrillic e
-])
+@pytest.mark.parametrize(
+    "email",
+    [
+        "Kate@example.com",  # KELVIN SIGN lowercases to ASCII "k"
+        "KATE@EXAMPLE.COṀ",
+        "kate＠example.com",  # fullwidth @
+        "kate@example.com\n",
+        " kate@example.com",
+        "kate@examplе.com",  # Cyrillic e
+    ],
+)
 def test_identity_unicode_confusables_do_not_match(tmp_path, monkeypatch, email):
-    monkeypatch.setenv("MCP_ENROLLMENT_FILE", _write(tmp_path / "e.json", {"users": {"kate@example.com": _entry()}}))
+    monkeypatch.setenv(
+        "MCP_ENROLLMENT_FILE",
+        _write(tmp_path / "e.json", {"users": {"kate@example.com": _entry()}}),
+    )
     assert enrollment.enrollment_for(_user("kate@example.com")).mode == "ro"
     assert enrollment.enrollment_for(_user("Kate@Example.com")).mode == "ro"
     with pytest.raises(PermissionError):
@@ -238,8 +260,15 @@ def test_same_size_same_mtime_revocation_is_seen(tmp_path):
 
 def test_concurrent_reloads_never_grant_more_than_the_file(tmp_path):
     path = tmp_path / "e.json"
-    docs = [{"users": {"kate@example.com": _entry("ro")}},
-            {"users": {"kate@example.com": _entry("ro"), "bob@example.com": _entry("ro", "bob@pve", "t-bob")}}]
+    docs = [
+        {"users": {"kate@example.com": _entry("ro")}},
+        {
+            "users": {
+                "kate@example.com": _entry("ro"),
+                "bob@example.com": _entry("ro", "bob@pve", "t-bob"),
+            }
+        },
+    ]
     _write(path, docs[0])
     errors = []
     stop = threading.Event()
@@ -276,23 +305,42 @@ def test_concurrent_reloads_never_grant_more_than_the_file(tmp_path):
 # ----------------------------------------------------------------------------- one person, one key
 
 
-@pytest.mark.parametrize("doc", [
-    # two users, same token credential
-    {"users": {"a@example.com": _entry("ro", "a@pve", "pve-token-x"),
-               "b@example.com": _entry("ro", "b@pve", "pve-token-x")}},
-    # same credential, differing only in case (case-insensitive credential stores)
-    {"users": {"a@example.com": _entry("ro", "a@pve", "pve-token-x"),
-               "b@example.com": _entry("ro", "b@pve", "PVE-TOKEN-X")}},
-    # user and service, same credential
-    {"users": {"a@example.com": _entry("ro", "a@pve", "pve-token-x")},
-     "services": {"svc1": _entry("ro", "svc@pve", "pve-token-x")}},
-    # two users, same proxmox user
-    {"users": {"a@example.com": _entry("ro", "shared@pve", "pve-token-a"),
-               "b@example.com": _entry("rw", "shared@pve", "pve-token-b")}},
-    # user and service, same proxmox user (case-insensitive)
-    {"users": {"a@example.com": _entry("ro", "Shared@pve", "pve-token-a")},
-     "services": {"svc1": _entry("ro", "shared@pve", "pve-token-b")}},
-])
+@pytest.mark.parametrize(
+    "doc",
+    [
+        # two users, same token credential
+        {
+            "users": {
+                "a@example.com": _entry("ro", "a@pve", "pve-token-x"),
+                "b@example.com": _entry("ro", "b@pve", "pve-token-x"),
+            }
+        },
+        # same credential, differing only in case (case-insensitive credential stores)
+        {
+            "users": {
+                "a@example.com": _entry("ro", "a@pve", "pve-token-x"),
+                "b@example.com": _entry("ro", "b@pve", "PVE-TOKEN-X"),
+            }
+        },
+        # user and service, same credential
+        {
+            "users": {"a@example.com": _entry("ro", "a@pve", "pve-token-x")},
+            "services": {"svc1": _entry("ro", "svc@pve", "pve-token-x")},
+        },
+        # two users, same proxmox user
+        {
+            "users": {
+                "a@example.com": _entry("ro", "shared@pve", "pve-token-a"),
+                "b@example.com": _entry("rw", "shared@pve", "pve-token-b"),
+            }
+        },
+        # user and service, same proxmox user (case-insensitive)
+        {
+            "users": {"a@example.com": _entry("ro", "Shared@pve", "pve-token-a")},
+            "services": {"svc1": _entry("ro", "shared@pve", "pve-token-b")},
+        },
+    ],
+)
 def test_shared_credential_or_userid_invalidates_file(tmp_path, monkeypatch, doc):
     path = _write(tmp_path / "e.json", doc)
     with pytest.raises(enrollment.EnrollmentError, match="share"):
@@ -303,7 +351,11 @@ def test_shared_credential_or_userid_invalidates_file(tmp_path, monkeypatch, doc
 
 
 def test_distinct_credentials_and_userids_accepted(tmp_path):
-    doc = {"users": {"a@example.com": _entry("ro", "a@pve", "pve-token-a"),
-                     "b@example.com": _entry("rw", "b@pve", "pve-token-b")},
-           "services": {"svc1": _entry("ro", "svc@pve", "pve-token-svc")}}
+    doc = {
+        "users": {
+            "a@example.com": _entry("ro", "a@pve", "pve-token-a"),
+            "b@example.com": _entry("rw", "b@pve", "pve-token-b"),
+        },
+        "services": {"svc1": _entry("ro", "svc@pve", "pve-token-svc")},
+    }
     assert len(enrollment.load_enrollments(_write(tmp_path / "e.json", doc))) == 3

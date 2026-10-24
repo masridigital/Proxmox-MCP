@@ -200,12 +200,10 @@ def test_shared_user_credential_or_secret_fails(broker):
     broker.users["bob@example.com"]["token_credential"] = "pve-token-alice"
     broker.users["bob@example.com"]["proxmox_userid"] = "mcp-alice@pve"
     broker.write_enrollment()
-    shared = by_id(run(broker), "dedicated_user")
-    assert {c["message"].split(" shared")[0] for c in shared} == {
-        "Proxmox user",
-        "token credential",
-        "token secret",
-    }
+    # enrollment.py now refuses a shared key at load time (one person, one key), so the
+    # whole file is invalid and selfcheck fails the enrollment check itself.
+    (check,) = by_id(run(broker), "enrollment")
+    assert check["status"] == "fail" and "invalid" in check["message"]
 
 
 def test_pam_user_warns(broker):

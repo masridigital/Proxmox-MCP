@@ -174,7 +174,9 @@ def test_path_keys_table_matches_handlers(name):
 
 def test_every_path_key_has_a_strict_validator():
     keys = set().union(*router.PATH_KEYS.values())
-    missing = sorted(k for k in keys if k not in router.PATH_PARAM_PATTERNS and k not in router.INT_PARAM_RANGES)
+    missing = sorted(
+        k for k in keys if k not in router.PATH_PARAM_PATTERNS and k not in router.INT_PARAM_RANGES
+    )
     assert missing == []
 
 
@@ -229,8 +231,10 @@ def test_hostile_path_values_are_refused(name, key, payload):
         router.validate_arguments(name, args)
 
 
-@pytest.mark.parametrize("name", [n for n in ALL if any(
-    k in router.INT_PARAM_RANGES for k in router.PATH_KEYS.get(n, ()))])
+@pytest.mark.parametrize(
+    "name",
+    [n for n in ALL if any(k in router.INT_PARAM_RANGES for k in router.PATH_KEYS.get(n, ()))],
+)
 def test_negative_and_huge_int_path_values_are_refused(name):
     for key in router.PATH_KEYS[name]:
         if key not in router.INT_PARAM_RANGES:
@@ -247,7 +251,9 @@ def test_negative_and_huge_int_path_values_are_refused(name):
 
 def _all_string_keys(name):
     props = router.REGISTRY[name][0]["inputSchema"].get("properties", {})
-    return sorted(k for k, s in props.items() if s.get("type") in ("string", "array") and "enum" not in s)
+    return sorted(
+        k for k, s in props.items() if s.get("type") in ("string", "array") and "enum" not in s
+    )
 
 
 @pytest.mark.parametrize("name", ALL)

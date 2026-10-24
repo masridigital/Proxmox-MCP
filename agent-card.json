@@ -1,6 +1,6 @@
 {
   "name": "proxmox-mcp-broker",
-  "description": "Proxmox VE operations for Claude through MCP, behind Cloudflare Access. Fork of ry-ops/proxmox-mcp-server. Claude sees three meta-tools (list_tools, describe_tool_input, execute_tool). Each person sees only the tools that the mode in the broker enrollment allows: 236 of 340 upstream tools can be enabled; the others are human-only and never exposed.",
+  "description": "Proxmox VE operations for Claude through MCP, behind Cloudflare Access. Fork of ry-ops/proxmox-mcp-server. Claude sees three meta-tools (list_tools, describe_tool_input, execute_tool). Each person sees only the tools that the mode in the broker enrollment allows: 234 of 340 upstream tools can be enabled; the others are human-only and never exposed.",
   "version": "2.4.0",
   "url": "https://<worker-hostname>/mcp",
   "protocol": {
@@ -222,7 +222,7 @@
             "until (optional)",
             "service (optional)"
           ],
-          "tier": "read"
+          "tier": "admin"
         },
         {
           "name": "get_node_journal",
@@ -236,15 +236,7 @@
             "until (optional)",
             "lastentries (optional)"
           ],
-          "tier": "read"
-        },
-        {
-          "name": "get_node_report",
-          "description": "Get a full diagnostic report for a node (OS, hardware, config).",
-          "inputs": [
-            "node"
-          ],
-          "tier": "read"
+          "tier": "admin"
         },
         {
           "name": "get_node_subscription",
@@ -787,7 +779,7 @@
             "limit (optional)",
             "start (optional)"
           ],
-          "tier": "read"
+          "tier": "admin"
         },
         {
           "name": "get_vm_rrddata",
@@ -1841,7 +1833,7 @@
             "since (optional)",
             "until (optional)"
           ],
-          "tier": "read"
+          "tier": "admin"
         },
         {
           "name": "get_cluster_firewall_log",
@@ -1852,7 +1844,7 @@
             "since (optional)",
             "until (optional)"
           ],
-          "tier": "read"
+          "tier": "admin"
         },
         {
           "name": "list_firewall_macros",
@@ -2439,12 +2431,6 @@
         {
           "name": "list_smtp_endpoints",
           "description": "List SMTP notification endpoints.",
-          "inputs": [],
-          "tier": "read"
-        },
-        {
-          "name": "list_webhook_endpoints",
-          "description": "List webhook notification endpoints.",
           "inputs": [],
           "tier": "read"
         },
