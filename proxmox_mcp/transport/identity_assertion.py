@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import math
 import re
 import threading
 import time
@@ -42,6 +43,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from cryptography.hazmat.primitives.serialization import load_pem_public_key
 
 from ..identity import Identity
+from .jws_strict import MalformedJws, parse_compact
 
 HEADER = "x-mcp-identity"
 ISSUER = "proxmox-mcp-worker"
@@ -58,6 +60,13 @@ _EMAIL_RE = re.compile(r"^[a-z0-9._%+-]{1,64}@[a-z0-9-]{1,63}(\.[a-z0-9-]{1,63})
 _JTI_RE = re.compile(r"^[A-Za-z0-9-]{8,128}$")
 _HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
 _RAY_RE = re.compile(r"^[A-Za-z0-9-]{1,64}$")
+_KID_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
+# What worker/src/assertion.ts emits. Anything else is refused: the Worker and the
+# broker are one contract, so an unexpected parameter or claim is a bug or an attack.
+_HEADER_PARAMS = frozenset({"alg", "typ", "kid"})
+_CLAIMS = frozenset(
+    {"iss", "aud", "sub", "iat", "exp", "nbf", "jti", "ray", "req", "method", "path"}
+)
 
 
 class AssertionConfigError(RuntimeError):
@@ -113,27 +122,38 @@ class ReplayCache:
         window: float = REPLAY_WINDOW_SECONDS,
         max_entries: int = MAX_REPLAY_ENTRIES,
         clock: Callable[[], float] = time.monotonic,
+        wall_clock: Callable[[], float] = time.time,
     ) -> None:
         self.window = window
         self.max_entries = max_entries
         self._clock = clock
-        self._seen: OrderedDict[str, float] = OrderedDict()  # jti -> expiry, insertion order
+        self._wall = wall_clock
+        # jti -> (monotonic expiry, wall-clock not_after), insertion order
+        self._seen: OrderedDict[str, tuple[float, float]] = OrderedDict()
         self._lock = threading.Lock()
 
-    def add(self, jti: str) -> None:
-        """Record ``jti``; raise AssertionDenied if it was seen inside the window."""
+    def add(self, jti: str, *, not_after: float | None = None) -> None:
+        """Record ``jti``; raise AssertionDenied if it is still remembered.
+
+        An entry is forgotten only when BOTH the monotonic window has passed AND
+        the wall clock is past ``not_after`` (the last wall-clock second at which
+        the token could verify). The monotonic half survives a wall clock jumping
+        forward; the wall half survives the wall clock stepping back, which would
+        otherwise make an expired assertion valid again after its jti was dropped.
+        """
         now = self._clock()
+        wall = self._wall()
         with self._lock:
             while self._seen:
-                oldest, expiry = next(iter(self._seen.items()))
-                if expiry > now:
+                oldest, (expiry, wall_expiry) = next(iter(self._seen.items()))
+                if expiry > now or wall_expiry >= wall:
                     break
                 del self._seen[oldest]
             if jti in self._seen:
                 raise AssertionDenied("replayed jti")
             if len(self._seen) >= self.max_entries:
                 raise AssertionDenied("replay cache full")
-            self._seen[jti] = now + self.window
+            self._seen[jti] = (now + self.window, wall if not_after is None else not_after)
 
     def __len__(self) -> int:
         with self._lock:
@@ -163,17 +183,19 @@ class IdentityAssertionVerifier:
     ) -> VerifiedAssertion:
         if not token:
             raise AssertionDenied("missing assertion")
-        if len(token) > MAX_TOKEN_BYTES or token.count(".") != 2:
-            raise AssertionDenied("malformed assertion")
+        # Strict pre-parse: canonical base64url, unique JSON keys, no NaN, header
+        # allowlist. The algorithm is fixed by configuration; the header only agrees.
         try:
-            header = jwt.get_unverified_header(token)
-        except jwt.PyJWTError:
-            raise AssertionDenied("malformed assertion header") from None
-        # The algorithm is fixed by configuration; the token's header only has to agree.
-        if header.get("alg") != "EdDSA":
-            raise AssertionDenied("algorithm not allowed")
-        if any(k in header for k in ("crit", "jku", "jwk", "x5u", "x5c")):
-            raise AssertionDenied("unsupported assertion header")
+            header, payload = parse_compact(
+                token, max_bytes=MAX_TOKEN_BYTES, alg="EdDSA", allowed_header=_HEADER_PARAMS
+            )
+        except MalformedJws as exc:
+            raise AssertionDenied(f"malformed assertion: {exc}") from None
+        kid = header.get("kid")
+        if kid is not None and (not isinstance(kid, str) or not _KID_RE.fullmatch(kid)):
+            raise AssertionDenied("bad kid")
+        if set(payload) - _CLAIMS:
+            raise AssertionDenied("unexpected claim")
 
         try:
             claims: dict[str, Any] = jwt.decode(
@@ -186,9 +208,11 @@ class IdentityAssertionVerifier:
                 options={
                     "require": ["iss", "aud", "sub", "iat", "exp", "jti"],
                     "verify_signature": True,
-                    "verify_exp": True,
-                    "verify_iat": True,
-                    "verify_nbf": True,
+                    # Time is checked below against self._now, the same clock
+                    # the replay cache is keyed on, not PyJWT's private one.
+                    "verify_exp": False,
+                    "verify_iat": False,
+                    "verify_nbf": False,
                     "verify_aud": True,
                     "verify_iss": True,
                 },
@@ -196,12 +220,20 @@ class IdentityAssertionVerifier:
         except jwt.PyJWTError as exc:
             raise AssertionDenied(f"invalid assertion: {type(exc).__name__}") from None
 
-        iat, exp = claims["iat"], claims["exp"]
-        if not all(isinstance(v, int | float) and not isinstance(v, bool) for v in (iat, exp)):
+        iat, exp, nbf = claims["iat"], claims["exp"], claims.get("nbf", claims["iat"])
+        if not all(
+            isinstance(v, int | float) and not isinstance(v, bool) and math.isfinite(v)
+            for v in (iat, exp, nbf)
+        ):
             raise AssertionDenied("bad time claims")
+        now = self._now()
+        if exp <= now - LEEWAY_SECONDS:
+            raise AssertionDenied("assertion expired")
+        if nbf > now + LEEWAY_SECONDS:
+            raise AssertionDenied("assertion not yet valid")
         if not 0 < exp - iat <= MAX_LIFETIME_SECONDS:
             raise AssertionDenied("assertion lifetime too long")
-        if iat > self._now() + LEEWAY_SECONDS:
+        if iat > now + LEEWAY_SECONDS:
             raise AssertionDenied("assertion issued in the future")
 
         # PyJWT accepts aud as a list containing ours; require exactly ours.
@@ -209,11 +241,11 @@ class IdentityAssertionVerifier:
             raise AssertionDenied("audience mismatch")
 
         sub = claims.get("sub")
-        if not isinstance(sub, str) or len(sub) > 254 or not _EMAIL_RE.match(sub):
+        if not isinstance(sub, str) or len(sub) > 254 or not _EMAIL_RE.fullmatch(sub):
             raise AssertionDenied("sub is not a lowercase email")
 
         req = claims.get("req")
-        if not isinstance(req, str) or not _HEX64_RE.match(req):
+        if not isinstance(req, str) or not _HEX64_RE.fullmatch(req):
             raise AssertionDenied("missing body hash")
         if not hmac.compare_digest(req, hashlib.sha256(body).hexdigest()):
             raise AssertionDenied("body hash mismatch")
@@ -223,13 +255,13 @@ class IdentityAssertionVerifier:
             raise AssertionDenied("path mismatch")
 
         jti = claims.get("jti")
-        if not isinstance(jti, str) or not _JTI_RE.match(jti):
+        if not isinstance(jti, str) or not _JTI_RE.fullmatch(jti):
             raise AssertionDenied("bad jti")
         ray = claims.get("ray")
-        ray_id = ray if isinstance(ray, str) and _RAY_RE.match(ray) else None
+        ray_id = ray if isinstance(ray, str) and _RAY_RE.fullmatch(ray) else None
 
         # Last: only a fully valid assertion consumes its jti.
-        self._replay.add(jti)
+        self._replay.add(jti, not_after=float(exp) + LEEWAY_SECONDS)
         return VerifiedAssertion(
             identity=Identity(subject=sub, kind="user", email=sub, ray_id=ray_id), jti=jti
         )

@@ -491,9 +491,15 @@ def test_oversize_chunked_body(env):
             for _ in range(10):
                 yield b"x" * 512
 
+        # Authenticated headers: since H1 the body is only read after the header
+        # checks pass, so an anonymous oversize stream is a 401 before any read.
+        headers = {
+            "cf-access-jwt-assertion": access_token(),
+            "x-mcp-identity": assertion(b"x" * 5120, "POST", "/v1/execute"),
+        }
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as c:
-            r = await c.post("/v1/execute", content=chunks())
+            r = await c.post("/v1/execute", content=chunks(), headers=headers)
             return r.status_code
 
     import anyio
