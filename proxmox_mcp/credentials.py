@@ -68,7 +68,7 @@ def credentials_dir() -> str:
 def _check_name(name: object) -> str:
     if (
         not isinstance(name, str)
-        or not NAME_RE.match(name)
+        or not NAME_RE.fullmatch(name)
         or ".." in name
         or name.lower().endswith(DPAPI_SUFFIX)
     ):
@@ -97,6 +97,9 @@ def _check_stat(name: str, st: os.stat_result) -> None:
         raise CredentialError(f"credential {name!r} is accessible to other users (expect 0400)")
     if st.st_uid not in (os.geteuid(), 0):
         raise CredentialError(f"credential {name!r} is owned by another user")
+    if st.st_nlink != 1:
+        # A second name for the file (hard link) lives outside this directory's control.
+        raise CredentialError(f"credential {name!r} has more than one link")
 
 
 def stat_credential(name: str) -> os.stat_result:
@@ -112,7 +115,8 @@ def stat_credential(name: str) -> os.stat_result:
     return st
 
 
-def _read_file(name: str, path: str) -> bytes:
+def _read_file(name: str, path: str) -> tuple[bytes, os.stat_result]:
+    """Contents and the fstat of the descriptor they were read from."""
     flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_CLOEXEC", 0)
     flags |= getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
     try:
@@ -129,7 +133,8 @@ def _read_file(name: str, path: str) -> bytes:
     try:
         st = os.fstat(fd)
         _check_stat(name, st)
-        if (st.st_dev, st.st_ino) != (before.st_dev, before.st_ino):
+        if not st.st_ino or (st.st_dev, st.st_ino) != (before.st_dev, before.st_ino):
+            # Also the Windows reparse-point race: lstat saw a file, open followed a link.
             raise CredentialError(f"credential {name!r} changed while opening")
         raw = b""
         while len(raw) <= MAX_BYTES:
@@ -141,7 +146,7 @@ def _read_file(name: str, path: str) -> bytes:
         os.close(fd)
     if len(raw) > MAX_BYTES:
         raise CredentialError(f"credential {name!r} is too large")
-    return raw
+    return raw, st
 
 
 def _dpapi_entropy() -> bytes | None:
@@ -150,13 +155,18 @@ def _dpapi_entropy() -> bytes | None:
         return None
     if not os.path.isabs(path):
         raise CredentialError("BROKER_DPAPI_ENTROPY_FILE must be an absolute path")
-    return _read_file("dpapi-entropy", path)
+    return _read_file("dpapi-entropy", path)[0]
 
 
 def read_credential(name: str) -> str:
     """The credential's text, one trailing newline stripped. Raises CredentialError."""
+    return read_credential_with_stat(name)[0]
+
+
+def read_credential_with_stat(name: str) -> tuple[str, os.stat_result]:
+    """Like read_credential, plus the fstat of the file actually read (for caching)."""
     path = credential_path(name)
-    raw = _read_file(name, path)
+    raw, st = _read_file(name, path)
     if path.endswith(DPAPI_SUFFIX):
         try:
             raw = dpapi_unprotect(raw, _dpapi_entropy())
@@ -168,13 +178,16 @@ def read_credential(name: str) -> str:
         text = raw.decode("utf-8")
     except UnicodeDecodeError:
         raise CredentialError(f"credential {name!r} is not valid UTF-8") from None
+    # Windows PowerShell 5.1 "Set-Content -Encoding UTF8" writes a BOM.
+    if text.startswith("\ufeff"):
+        text = text[1:]
     if text.endswith("\r\n"):
         text = text[:-2]
     elif text.endswith("\n"):
         text = text[:-1]
     if not text:
         raise CredentialError(f"credential {name!r} is empty")
-    return text
+    return text, st
 
 
 # --- DPAPI (Windows, ctypes) ------------------------------------------------------------
@@ -288,7 +301,7 @@ class ApiToken:
 
 def parse_api_token(text: str, *, expected_userid: str | None = None) -> ApiToken:
     """Parse ``user@realm!tokenname=uuid``; optionally require the user part to match."""
-    m = TOKEN_RE.match(text.strip()) if isinstance(text, str) else None
+    m = TOKEN_RE.fullmatch(text.strip()) if isinstance(text, str) else None
     if not m:
         raise CredentialError("API token credential is malformed (expect user@realm!name=<uuid>)")
     token = ApiToken(m["userid"], m["tokenname"], m["secret"])
