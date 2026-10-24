@@ -1,0 +1,29 @@
+{
+  "_warning": "TEST ONLY. This key pair is public and must never be deployed or trusted anywhere.",
+  "description": "X-MCP-Identity cross-implementation vector (EdDSA/Ed25519 compact JWS).",
+  "private_key_pkcs8_pem": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIJXdlqrYxUto9pyrlQ3Moxxoc1hDeW57O+/mjoBBT/cu\n-----END PRIVATE KEY-----\n",
+  "public_key_spki_pem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAvGjbRqBtB6q7IbohBAdGmr93cR8Apu9YaZPh9faEGDk=\n-----END PUBLIC KEY-----\n",
+  "public_key_raw_b64url": "vGjbRqBtB6q7IbohBAdGmr93cR8Apu9YaZPh9faEGDk",
+  "kid": "test-key-1",
+  "body": "{\"tool\":\"get_node_status\",\"arguments\":{\"node\":\"pve1\"}}",
+  "body_sha256": "f268f285ad1ce10ec4afdaa673083b49c461d853b379cfecfdf21bd37147dc20",
+  "header": {
+    "alg": "EdDSA",
+    "typ": "JWT",
+    "kid": "test-key-1"
+  },
+  "claims": {
+    "iss": "proxmox-mcp-worker",
+    "aud": "proxmox-broker",
+    "sub": "alice@example.com",
+    "iat": 1767225600,
+    "exp": 1767225660,
+    "jti": "00000000-0000-4000-8000-000000000001",
+    "ray": "8f00000000000000-EWR",
+    "req": "f268f285ad1ce10ec4afdaa673083b49c461d853b379cfecfdf21bd37147dc20",
+    "method": "POST",
+    "path": "/v1/execute"
+  },
+  "jws": "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsImtpZCI6InRlc3Qta2V5LTEifQ.eyJpc3MiOiJwcm94bW94LW1jcC13b3JrZXIiLCJhdWQiOiJwcm94bW94LWJyb2tlciIsInN1YiI6ImFsaWNlQGV4YW1wbGUuY29tIiwiaWF0IjoxNzY3MjI1NjAwLCJleHAiOjE3NjcyMjU2NjAsImp0aSI6IjAwMDAwMDAwLTAwMDAtNDAwMC04MDAwLTAwMDAwMDAwMDAwMSIsInJheSI6IjhmMDAwMDAwMDAwMDAwMDAtRVdSIiwicmVxIjoiZjI2OGYyODVhZDFjZTEwZWM0YWZkYWE2NzMwODNiNDljNDYxZDg1M2IzNzljZmVjZmRmMjFiZDM3MTQ3ZGMyMCIsIm1ldGhvZCI6IlBPU1QiLCJwYXRoIjoiL3YxL2V4ZWN1dGUifQ.yOVOU0uETsZ3i5ttp7N_5Kuk6EDJDOW30hy-X1YYd3hZPVA6tfITcFt7zgL6Yl9QVy4p3Wx-ceflpMEn9A4RCQ",
+  "verify_at_unix": 1767225630
+}

@@ -1,0 +1,59 @@
+// TEMPLATE. Placeholders only: replace every <...> value at deploy time (deploy/ renders
+// this file). Never commit real hostnames, account IDs, AUD tags or service IDs.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "proxmox-mcp",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  // No nodejs_compat: the Worker uses Web APIs only.
+  "compatibility_flags": [],
+
+  // Only the custom domain behind the Access app serves this Worker. workers.dev and preview
+  // URLs are off so there is no hostname that bypasses Cloudflare Access.
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "<worker-hostname>", "custom_domain": true }],
+
+  // Audit completeness: every invocation is logged (head sampling 1).
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+
+  "vars": {
+    "CF_ACCESS_TEAM_DOMAIN": "https://<team>.cloudflareaccess.com",
+    "CF_ACCESS_AUD": "<worker-access-app-aud>",
+    "WORKER_HOSTNAME": "<worker-hostname>",
+    // "vpc" (Workers VPC Service binding, preferred) or "access" (public hostname + service token)
+    "BROKER_MODE": "vpc",
+    // vpc: http://broker.internal (Host/SNI only; the VPC Service decides the real target)
+    // access: https://<broker-hostname>
+    "BROKER_URL": "http://broker.internal",
+    "IDENTITY_KEY_ID": "<identity-key-id>",
+    "ALLOWED_EMAILS": "",
+    "ALLOWED_EMAIL_DOMAINS": "",
+    "ALLOWED_ORIGINS": "",
+    "RATE_PER_DAY": "2000"
+  },
+  // Secrets (wrangler secret put <NAME>; never in this file):
+  //   IDENTITY_SIGNING_KEY         Ed25519 private key, PKCS8 PEM (broker holds the public key)
+  //   BROKER_ACCESS_CLIENT_ID      BROKER_MODE=access only: Access service token client id
+  //   BROKER_ACCESS_CLIENT_SECRET  BROKER_MODE=access only: Access service token secret
+
+  // Workers VPC (beta): private route to the broker through its Cloudflare Tunnel.
+  // Remove this block when BROKER_MODE=access.
+  "vpc_services": [{ "binding": "BROKER", "service_id": "<vpc-service-id>", "remote": true }],
+
+  // Per-user per-minute limit. The limit lives here (not in vars): 60 calls / 60 s.
+  // namespace_id: any positive integer unique within the account.
+  "ratelimits": [{ "name": "RATE_LIMITER", "namespace_id": "<ratelimit-namespace-id>", "simple": { "limit": 60, "period": 60 } }],
+
+  "durable_objects": {
+    "bindings": [
+      { "name": "DAILY_QUOTA", "class_name": "DailyQuota" },
+      { "name": "AUDIT_CHAIN", "class_name": "AuditChain" }
+    ]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["DailyQuota", "AuditChain"] }],
+
+  // Hash-chained audit batches. Configure bucket lock (retention 2190 days) on this bucket
+  // outside code; the Worker only ever creates new objects.
+  "r2_buckets": [{ "binding": "AUDIT_BUCKET", "bucket_name": "replace-me-audit-bucket" }]
+}

@@ -1,0 +1,26 @@
+{
+  "name": "proxmox-mcp-worker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cloudflare Worker: inbound MCP gateway for the Proxmox MCP broker (MCP-STD-01/02).",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check-config": "wrangler deploy --dry-run --outdir dist",
+    "gen-vector": "node scripts/gen-assertion-vector.mjs"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261008.1",
+    "typescript": "6.0.3",
+    "vitest": "5.0.3",
+    "wrangler": "4.149.0"
+  },
+  "overrides": {
+    "undici": "7.30.1"
+  }
+}
