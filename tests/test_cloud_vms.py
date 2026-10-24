@@ -6,16 +6,26 @@ import httpx
 import pytest
 
 from proxmox_mcp import client as client_mod
+from proxmox_mcp.credentials import parse_api_token
+from proxmox_mcp.identity import Identity
 from proxmox_mcp.tools import appliances
 
 KEY = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexample user@host"
+
+
+def _offline(monkeypatch):
+    """Local identity, an rw token and no audit file: these tests exercise the tool handlers."""
+    token = parse_api_token("dev@pve!test=00000000-0000-0000-0000-000000000000")
+    monkeypatch.setattr(client_mod, "require_identity", lambda: Identity("dev", "local"))
+    monkeypatch.setattr(client_mod.ProxmoxClient, "resolve_auth", lambda self, ident: ("rw", token))
+    monkeypatch.setattr(client_mod.audit, "audit_event", lambda **fields: None)
 
 
 def make_client(monkeypatch, handler):
     monkeypatch.setattr(client_mod, "PROXMOX_HOST", "pve.test")
     monkeypatch.setattr(client_mod, "PROXMOX_READ_ONLY", False)
     c = client_mod.ProxmoxClient()
-    c.token = "PVEAPIToken=u!t=v"
+    _offline(monkeypatch)
     c.client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
     return c
 
@@ -114,5 +124,5 @@ async def test_refuses_existing_names_and_vmids(monkeypatch):
 
 
 def test_registered():
-    from proxmox_mcp import server
-    assert {"deploy_cloud_vms", "deploy_fortigate_vm"} <= {t.name for t in server.ALL_TOOLS}
+    from proxmox_mcp import router
+    assert {"deploy_cloud_vms", "deploy_fortigate_vm"} <= set(router.REGISTRY)

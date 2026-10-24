@@ -7,14 +7,24 @@ import httpx
 import pytest
 
 from proxmox_mcp import client as client_mod
+from proxmox_mcp.credentials import parse_api_token
+from proxmox_mcp.identity import Identity
 from proxmox_mcp.tools import appliances, qemu, storage
+
+
+def _offline(monkeypatch):
+    """Local identity, an rw token and no audit file: these tests exercise the tool handlers."""
+    token = parse_api_token("dev@pve!test=00000000-0000-0000-0000-000000000000")
+    monkeypatch.setattr(client_mod, "require_identity", lambda: Identity("dev", "local"))
+    monkeypatch.setattr(client_mod.ProxmoxClient, "resolve_auth", lambda self, ident: ("rw", token))
+    monkeypatch.setattr(client_mod.audit, "audit_event", lambda **fields: None)
 
 
 def make_client(monkeypatch, handler):
     monkeypatch.setattr(client_mod, "PROXMOX_HOST", "pve.test")
     monkeypatch.setattr(client_mod, "PROXMOX_READ_ONLY", False)
     c = client_mod.ProxmoxClient()
-    c.token = "PVEAPIToken=u!t=v"
+    _offline(monkeypatch)
     c.client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
     return c
 
@@ -32,8 +42,8 @@ async def test_error_includes_proxmox_reason(monkeypatch):
 
 async def test_error_falls_back_to_message(monkeypatch):
     c = make_client(monkeypatch, lambda r: httpx.Response(403, json={"data": None, "message": "Permission check failed\n"}))
-    with pytest.raises(httpx.HTTPStatusError, match="403 Forbidden for POST /api2/json/x: Permission check failed"):
-        await c.post("/x")
+    with pytest.raises(httpx.HTTPStatusError, match="403 Forbidden for POST /api2/json/nodes/pve01/qemu: Permission check failed"):
+        await c.post("/nodes/pve01/qemu")
 
 
 async def test_download_url_uses_hyphenated_params(monkeypatch):
@@ -129,6 +139,6 @@ async def test_wait_task_raises_on_failure(monkeypatch):
 
 
 def test_tool_count():
-    from proxmox_mcp import server
-    assert "deploy_fortigate_vm" in {t.name for t in server.ALL_TOOLS}
+    from proxmox_mcp import router
+    assert "deploy_fortigate_vm" in set(router.REGISTRY)
     assert json.dumps(appliances.TOOLS)  # schema is JSON-serialisable
