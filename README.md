@@ -1,428 +1,240 @@
-<p align="center">
-  <img src="docs/hero.svg" width="100%" alt="You ask your assistant to clone VM 9000 to web-02 and start it; clone_vm and start_vm flow through proxmox-mcp-server to the Proxmox cluster, and the new VM lights up on pve2.">
-</p>
+# Proxmox MCP broker
 
-<p align="center">
-  <a href="https://github.com/ry-ops/proxmox-mcp-server/releases"><img src="https://img.shields.io/github/v/release/ry-ops/proxmox-mcp-server?color=ff8a1f&label=release" alt="Release"></a>
-  <img src="https://img.shields.io/badge/tools-340-ff8a1f" alt="340 tools">
-  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10+-3ec7ff" alt="Python 3.10+"></a>
-  <a href="https://modelcontextprotocol.io/"><img src="https://img.shields.io/badge/MCP-1.x-b58cff" alt="MCP"></a>
-  <a href="https://github.com/ry-ops/proxmox-mcp-server/pkgs/container/proxmox-mcp-server"><img src="https://img.shields.io/badge/docker-ghcr.io-3ddc84" alt="Docker image on ghcr.io"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-ffb02e" alt="MIT"></a>
-</p>
+This repository lets Claude operate a Proxmox VE cluster through the Model Context
+Protocol (MCP), behind Cloudflare Access, with per-person accountability.
 
-<p align="center"><b>Talk to your Proxmox cluster.</b> A Model Context Protocol server that gives Claude, or any MCP client, the <b>whole Proxmox VE API</b>: 340 tools across VMs, containers, storage, clustering, Ceph, SDN and more.</p>
+It is a fork of [ry-ops/proxmox-mcp-server](https://github.com/ry-ops/proxmox-mcp-server)
+by ry-ops (MIT license), imported at upstream commit `7276144`. The 340 Proxmox tools
+and their handlers are the upstream code. This fork adds the security layers around
+them: identity, policy, per-user API tokens, verified TLS, output filters and a
+hash-chained audit log.
 
-<p align="center">
-  <a href="#talk">Talk to it</a> ·
-  <a href="#how">How it works</a> ·
-  <a href="#tools">340 tools</a> ·
-  <a href="#quick-start">Quick start</a> ·
-  <a href="#read-only">Read-only mode</a> ·
-  <a href="#a2a">A2A</a> ·
-  <a href="#troubleshooting">Troubleshooting</a>
-</p>
+## Contents
 
----
+- [Architecture](#architecture)
+- [Security model](#security-model)
+- [Modes and tool tiers](#modes-and-tool-tiers)
+- [Compliance gate](#compliance-gate)
+- [Configuration](#configuration)
+- [Local development](#local-development)
+- [Tests](#tests)
+- [Documents](#documents)
+- [Changes from upstream](#changes-from-upstream)
+- [Credits and license](#credits-and-license)
 
-## ✨ Highlights
+## Architecture
 
-- 🧰 **The whole API, not a demo.** 340 tools across 14 areas: nodes, QEMU VMs, LXC containers, storage and backup, cluster and HA, access control, firewall, disks, Ceph, ACME, SDN, notifications, pools and appliances.
-- 🖥️ **Inside your guests too.** Run commands through the QEMU guest agent (`vm_agent_exec` → `vm_agent_exec_status`) and read back the exit code and output.
-- 🔒 **Look-but-don't-touch with one switch.** `PROXMOX_READ_ONLY=true` refuses every write inside the server, and 149 read-only tools keep working.
-- 🔑 **API tokens or passwords.** Tokens are recommended; pair them with a `PVEAuditor` role for monitoring.
-- 🐳 **Runs anywhere.** Use `uv` from a clone, or the multi-arch image on `ghcr.io`.
-- 🤝 **A2A-ready.** `agent-card.json` lists every tool in 14 skill categories, for agent-to-agent discovery.
-- 🛡️ **Appliances.** `deploy_fortigate_vm` builds a FortiGate-VM from Fortinet's KVM image, with WAN/LAN NICs on the bridges and VLANs you choose. `deploy_cloud_vms` builds cluster-ready VMs from a cloud image, with your SSH key and a static IP each, ready for k3s-mcp-server's `create_cluster`.
+The system has two parts on two sides of a trust boundary:
 
-<a id="talk"></a>
+- The **Cloudflare Worker** (`worker/`) is the inbound gateway. It speaks MCP to
+  Claude. It holds no Proxmox credential.
+- The **broker** (this Python package) is the outbound gateway. It runs on an
+  on-premises Windows Server host. It holds the Proxmox API tokens and makes the
+  final policy decision.
 
-## 💬 Talk to your cluster
-
-<p align="center">
-  <img src="docs/chat.svg" width="100%" alt="A chat runs df -h inside VM 120 via the QEMU guest agent and shows the disk usage; a side panel cycles through more questions and the tools that answer them.">
-</p>
-
-Once it's connected, just ask:
-
-> *"Can you list all VMs in my Proxmox cluster?"*
-> *"What's the status of VM 100 on node pve1?"*
-> *"Create a snapshot called 'backup-2025' for VM 100 on pve1."*
-> *"Show me the storage usage on all nodes."*
-> *"List all running tasks in the cluster."*
-> *"Clone VM 9000 to a new VM called web-02 and start it."*
-> *"Run `df -h` inside VM 120 using the guest agent and show me the output."*
-> *"Make three Ubuntu VMs on pve1 at 192.168.1.181–183 with my SSH key, ready for a K3s cluster."*
-
-There are more worked examples in [USAGE.md](USAGE.md).
-
-<a id="how"></a>
-
-## ⚙️ How it works
-
-<p align="center">
-  <img src="docs/how-it-works.svg" width="100%" alt="MCP clients talk to proxmox-mcp-server over stdio; the server calls the Proxmox VE API over HTTPS on port 8006. With read-only mode on, GET requests pass and POST, PUT and DELETE are refused inside the server.">
-</p>
-
-- **Your MCP client** (Claude Desktop, Claude Code, or anything that speaks MCP) starts the server and talks to it over **stdio**.
-- **The server** (Python, `httpx`, the MCP SDK) turns each tool call into a request to the **Proxmox VE REST API** over HTTPS on port **8006**, authenticated with an **API token** or a **password**.
-- **Read-only mode** is checked in the server's HTTP client, so a refused write never leaves your machine.
-
-<a id="tools"></a>
-
-## 🧰 340 tools, 14 areas
-
-<p align="center">
-  <img src="docs/tools.svg" width="100%" alt="A tile map of the 340 tools by API area: QEMU VMs 46, nodes 38, cluster and HA 37, access control 33, Ceph 33, firewall 31, LXC 28, notifications 23, disks 17, ACME 17, SDN 16, storage and backup 14, pools 5, appliances 2.">
-</p>
-
-| Area | Tools | Highlights |
-|------|------:|------------|
-| Nodes | 38 | Status, config, DNS/hosts/time, network interfaces, services, APT updates, syslog, power |
-| QEMU VMs | 46 | Lifecycle, create/clone/delete, config, snapshots, migration, disk resize/move, RRD metrics, guest agent (`vm_agent_exec`, `vm_agent_exec_status`), VNC proxy |
-| LXC containers | 28 | Lifecycle, create/clone/delete, config, snapshots, migration, resize |
-| Storage & backup | 14 | Storage definitions, content and volumes, URL downloads, `vzdump` backup and restore |
-| Cluster | 37 | Status, resources, options, log, tasks, HA resources/groups, replication, backup jobs |
-| Access control | 33 | Users, API tokens, groups, roles, ACLs, realms |
-| Firewall | 31 | Cluster and node rules, security groups, aliases, IP sets, macros, logs (per-VM and per-container rules are in the guest modules) |
-| Disks | 17 | SMART, wipe, GPT init, LVM, LVM-thin, ZFS, directory storage |
-| Ceph | 33 | Status, OSDs, monitors, managers, MDS, pools, flags, CRUSH |
-| ACME & certificates | 17 | ACME accounts and plugins, node certificate ordering, custom certs |
-| SDN | 16 | Zones, VNets, subnets, apply |
-| Notifications | 23 | Gotify, sendmail, SMTP and webhook endpoints, matchers |
-| Pools | 5 | Resource pool CRUD |
-| Appliances | 2 | `deploy_fortigate_vm`: FortiGate-VM from Fortinet's KVM image, WAN/LAN NICs on chosen bridges and VLANs, sized for the free evaluation license. `deploy_cloud_vms`: VMs from a cloud image (e.g. Ubuntu's) with cloud-init user, SSH key and a static IP or DHCP each, disk grown and started |
-
-Tool names follow the Proxmox API: `list_*`, `get_*`, `create_*`, `update_*`/`set_*`, `delete_*`, plus actions such as `start_vm`, `migrate_container` or `apply_sdn`. Each area is one module in [`proxmox_mcp/tools/`](proxmox_mcp/tools/). Your MCP client shows every tool with its full input schema, or you can list them all locally:
-
-```bash
-uv run python -c "from proxmox_mcp.server import ALL_TOOLS; print('\n'.join(sorted(t.name for t in ALL_TOOLS)))"
+```
+Claude (claude.ai, Desktop, Code)
+  |
+  |  HTTPS, OAuth (Cloudflare Access Managed OAuth, Entra ID with MFA)
+  v
+Cloudflare MCP Server Portal + Access application (named users only)
+  |
+  v
+Cloudflare Worker  https://<worker-hostname>/mcp
+  |  - verifies the Access JWT again (RS256, team keys, issuer, audience)
+  |  - JSON-RPC allowlist, size cap, per-user rate limit
+  |  - 3 meta-tools: list_tools, describe_tool_input, execute_tool (MCP-STD-02)
+  |  - signs an Ed25519 identity assertion for each broker call
+  |  - redacts secrets and PHI patterns, labels results as untrusted data
+  |
+  |  Workers VPC binding, or Access service token, over a Cloudflare Tunnel
+  v
+cloudflared (Windows service, outbound connections only)
+  |
+  v
+Broker  http://127.0.0.1:<port>   GET /healthz, GET /v1/catalog, POST /v1/execute
+  |  - verifies the Access service-token JWT (the caller is the Worker)
+  |  - verifies the identity assertion (signature, 60 s life, body hash, replay cache)
+  |  - enrollment: user email -> mode (ro, operator, rw) and Proxmox token
+  |  - tool policy, strict argument validation, rate limit
+  |  - upstream tool handler
+  |  - outbound policy: method and path allowlist per mode, deny list, PHI check
+  |  - audit: one hash-chained JSON line per event, no argument values
+  |
+  |  HTTPS, TLS 1.2 or later, CA bundle or SHA-256 certificate pin
+  v
+Proxmox VE API  https://<proxmox-host>:8006   (one privilege-separated token per person)
 ```
 
-### Handy recipes
+The Proxmox API tokens never leave the broker host. Cloudflare holds no Proxmox
+credential. The broker holds only the public half of the Worker signing key, so a
+broker compromise cannot forge identities.
 
-| Task | Tools |
-|------|-------|
-| Inventory | `list_nodes`, `get_cluster_resources`, `list_vms`, `list_containers`, `list_storage` |
-| VM lifecycle | `start_vm`, `shutdown_vm`, `stop_vm`, `reboot_vm`, `create_vm`, `clone_vm`, `migrate_vm` |
-| Disk images | `download_url_to_storage` with `content=import`, then `create_vm` with `scsi0=local-lvm:0,import-from=local:import/<image>`, or `import_vm_disk` |
-| Snapshots | `create_vm_snapshot`, `list_vm_snapshots`, `rollback_vm_snapshot`, `delete_vm_snapshot` |
-| Monitoring | `get_node_status`, `get_vm_status`, `get_vm_rrddata`, `get_node_storage_status` |
-| Tasks | `list_cluster_tasks`, `list_node_tasks`, `get_task_status`, `get_task_log` |
-| Guest agent | `vm_agent_exec` (returns a PID), then `vm_agent_exec_status` for the exit code and output |
-| Cluster nodes | `download_url_to_storage` for a cloud image with `content=import`, then `deploy_cloud_vms`; hand the IPs to [k3s-mcp-server](https://github.com/ry-ops/k3s-mcp-server)'s `create_cluster` |
+Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full design.
 
-<a id="quick-start"></a>
+## Security model
 
-## 🚀 Quick start
+Each layer fails closed. A later layer does not trust an earlier layer.
 
-You need **Python 3.10+** with [`uv`](https://github.com/astral-sh/uv), or Docker, and **Proxmox VE 6.0 or later**.
+| Layer | Control | Where |
+|---|---|---|
+| Person | Entra ID login with MFA. Access policy names each user. | Cloudflare Access |
+| Session | Access token 10 min. OAuth session 8 h. Identity assertion 60 s. | Access, Worker |
+| Gateway | JWT verified again, JSON-RPC allowlist, 256 KB cap, rate limit. | `worker/` |
+| Broker entry | Service-token JWT, Host allowlist, no Origin, 256 KB cap. | `proxmox_mcp/transport/http_app.py` |
+| Identity | Ed25519 assertion bound to body, method and path. Single use. | `proxmox_mcp/transport/identity_assertion.py` |
+| Access list | `enrollment.json` maps each email to one mode and one token. | `proxmox_mcp/enrollment.py` |
+| Tool policy | Every tool has a tier. Unknown tools are forbidden. | `proxmox_mcp/policy.py` |
+| Arguments | Strict JSON Schema check. Path values have fixed patterns. | `proxmox_mcp/router.py` |
+| Outbound | Method and path allowlist per mode. DELETE needs rw. Deny list for tokens, TFA, consoles, guest agent exec. | `proxmox_mcp/outbound.py` |
+| PHI | Writes that contain PHI patterns are refused. Results are redacted. | `proxmox_mcp/phi.py`, `proxmox_mcp/output.py` |
+| Proxmox | One privilege-separated API token per person. Proxmox ACLs limit each token. | Proxmox VE |
+| TLS | Verified chain or SHA-256 pin. No redirects. No proxy settings from the environment. | `proxmox_mcp/client.py` |
+| Output | Secret fields redacted. 2 MiB cap. Untrusted-data label on every result. | `proxmox_mcp/output.py` |
+| Audit | Hash-chained JSONL with user, ray ID, tool, method, path, status. Keys and a hash of arguments, never values. | `proxmox_mcp/audit.py` |
 
-**1. Make an API token.** In the Proxmox UI, go to **Datacenter → Permissions → API Tokens → Add**. For full access, uncheck *Privilege Separation* so the token inherits your user's permissions. Copy the secret; you won't see it again. The full token ID looks like `root@pam!automation`.
+Secrets are files, not environment variables. On Windows they are in the broker
+credentials directory, protected by DPAPI and by an ACL for the service account.
+On Linux they are systemd credentials.
 
-**2. Run the server** with one of these:
+Read [docs/SECURITY.md](docs/SECURITY.md) for the threat model and risk register.
 
-<details open>
-<summary><b>uv, from a clone</b></summary>
+## Modes and tool tiers
 
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh     # if you don't have uv
-git clone https://github.com/ry-ops/proxmox-mcp-server && cd proxmox-mcp-server
-./setup.sh                                          # or: uv sync
+Each tool has one tier. Each enrolled person has one mode.
 
-export PROXMOX_HOST="192.168.1.100"
-export PROXMOX_USER="root@pam"
-export PROXMOX_TOKEN_NAME="automation"
-export PROXMOX_TOKEN_VALUE="your-token-here"
-./test-connection.sh                                # checks connection, auth and permissions
-```
+| Tier | Tools | What it covers |
+|---|---|---|
+| read | 140 | GET only: inventory, status, configuration, logs, tasks. |
+| operate | 16 | Reversible guest lifecycle: start, stop, shutdown, reboot, reset, suspend, resume, snapshot create. |
+| admin | 80 | Guest create, clone, delete, configuration, disks, migration, guest firewall, pools, HA, backup jobs, SDN. |
+| forbidden | 104 | Never available: users, tokens, ACLs, TFA, passwords, consoles, guest agent exec and files, cloud-init user data, host power and network, host disks, cluster firewall, certificates, storage definitions, notification endpoints. |
 
-A `.env` file in the project directory is loaded automatically; see [`.env.example`](.env.example).
-</details>
+| Mode | Tiers | Tools |
+|---|---|---|
+| ro | read | 140 |
+| operator | read, operate | 156 |
+| rw | read, operate, admin | 236 when `MCP_ALLOW_ADMIN_TOOLS=1`, else 156 |
 
-<details>
-<summary><b>Docker</b></summary>
+The default for every new person is `ro`. Admin tools stay off until the operator
+sets `MCP_ALLOW_ADMIN_TOOLS=1` on the broker. `MCP_TOOL_DENY` and `MCP_TOOL_ALLOW`
+can restrict the set more. They cannot add a tool.
 
-A multi-arch image is published to GitHub Container Registry on every push to `main` and for each release tag:
+## Compliance gate
 
-```bash
-docker pull ghcr.io/ry-ops/proxmox-mcp-server:latest   # or a version tag, e.g. :2.4.0
-docker run -i --rm --env-file .env ghcr.io/ry-ops/proxmox-mcp-server:latest
-```
+This build is designed for HIPAA Security Rule and SOC 2 audits.
 
-MCP clients talk over stdio, so run the container interactively (`-i`). `docker-compose.yaml` does the same using your `.env`.
-</details>
+> **Go-live gate.** Protected health information (PHI) can pass through Cloudflare
+> and Anthropic. Do not connect a system that holds PHI until a Business Associate
+> Agreement (BAA) is signed with both Cloudflare and Anthropic.
 
-**3. Connect your MCP client.** For Claude Desktop, edit `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS, or `%APPDATA%/Claude/claude_desktop_config.json` on Windows:
+The tools that read guest content are forbidden, and PHI patterns are redacted and
+refused on writes. These controls reduce exposure. They do not replace the BAA.
 
-<details open>
-<summary><b>uv + API token (recommended)</b></summary>
+Read [docs/COMPLIANCE.md](docs/COMPLIANCE.md) for the control map and the evidence
+that an auditor collects.
+
+## Configuration
+
+The broker reads its settings from environment variables and its secrets from the
+credentials directory. [.env.example](.env.example) lists every setting with a
+safe example value. Do not put a token or a password in `.env`.
+
+The credentials directory contains:
+
+| File | Content |
+|---|---|
+| `enrollment.json` | The access list: email, mode, Proxmox user ID, name of the token file. |
+| `pve-token-<name>` | One line: `<user>@<realm>!<token-name>=<secret>`. One file per person. |
+| `worker-identity.pub` | The Worker's Ed25519 public key (PEM). |
+
+Example `enrollment.json`:
 
 ```json
 {
-  "mcpServers": {
-    "proxmox": {
-      "command": "uv",
-      "args": ["--directory", "/absolute/path/to/proxmox-mcp-server", "run", "proxmox-mcp-server"],
-      "env": {
-        "PROXMOX_HOST": "192.168.1.100",
-        "PROXMOX_USER": "root@pam",
-        "PROXMOX_TOKEN_NAME": "automation",
-        "PROXMOX_TOKEN_VALUE": "your-token-value-here"
-      }
+  "users": {
+    "alice@example.com": {
+      "mode": "ro",
+      "proxmox_userid": "mcp-alice@pve",
+      "token_credential": "pve-token-alice"
     }
   }
 }
 ```
-Use the **absolute** path to your clone.
-</details>
 
-<details>
-<summary><b>uv + password</b></summary>
+Read [docs/RUNBOOK.md](docs/RUNBOOK.md) to install the broker, enroll a person,
+rotate a token, and stop the service in an emergency.
 
-```json
-{
-  "mcpServers": {
-    "proxmox": {
-      "command": "uv",
-      "args": ["--directory", "/absolute/path/to/proxmox-mcp-server", "run", "proxmox-mcp-server"],
-      "env": {
-        "PROXMOX_HOST": "192.168.1.100",
-        "PROXMOX_USER": "root@pam",
-        "PROXMOX_PASSWORD": "your-password-here"
-      }
-    }
-  }
-}
-```
-</details>
+## Local development
 
-<details>
-<summary><b>Docker</b></summary>
+You can run the upstream stdio server on a workstation, against a lab cluster:
 
-```json
-{
-  "mcpServers": {
-    "proxmox": {
-      "command": "docker",
-      "args": ["run", "-i", "--rm",
-        "-e", "PROXMOX_HOST", "-e", "PROXMOX_USER", "-e", "PROXMOX_TOKEN_NAME", "-e", "PROXMOX_TOKEN_VALUE",
-        "ghcr.io/ry-ops/proxmox-mcp-server:latest"],
-      "env": {
-        "PROXMOX_HOST": "192.168.1.100",
-        "PROXMOX_USER": "root@pam",
-        "PROXMOX_TOKEN_NAME": "automation",
-        "PROXMOX_TOKEN_VALUE": "your-token-value-here"
-      }
-    }
-  }
-}
-```
-</details>
-
-**4. Restart your client completely** (quit it, don't just close the window), and ask it to list your VMs. More detail in [QUICKSTART.md](QUICKSTART.md) and [SETUP.md](SETUP.md).
-
-## 🔧 Configuration
-
-| Variable | Required | Default | What it does |
-|---|:---:|---|---|
-| `PROXMOX_HOST` | ✅ | | Hostname or IP, **without** scheme or port (`192.168.1.100`, not `https://192.168.1.100:8006`) |
-| `PROXMOX_USER` | ✅ | | e.g. `root@pam`, `admin@pve` |
-| `PROXMOX_TOKEN_NAME` + `PROXMOX_TOKEN_VALUE` | one of | | API token auth (recommended) |
-| `PROXMOX_PASSWORD` | one of | | Password auth |
-| `PROXMOX_PORT` | | `8006` | API port |
-| `PROXMOX_VERIFY_SSL` | | `false` | Verify the server's TLS certificate |
-| `PROXMOX_READ_ONLY` | | `false` | Refuse every write; see below |
-
-<a id="read-only"></a>
-
-## 🔒 Read-only mode and security
-
-**`PROXMOX_READ_ONLY=true`** makes the server look-but-don't-touch. Only GET requests are sent, and every create, update, delete or action tool is refused inside the server before it reaches the network. **149 of the 340 tools are read-only and keep working.** Three read-style tools send POST requests, so they're blocked too:
-- `vm_agent_ping`;
-- `get_vm_vnc_proxy` and `get_vm_spice_proxy`, which create console access tickets.
-
-The rest of the security picture:
-
-- **For monitoring-only use, combine both locks:** `PROXMOX_READ_ONLY=true` *and* a token with the **`PVEAuditor`** role. The flag stops the server sending writes; the role makes Proxmox refuse them anyway.
-- **The token's permissions are the real limit.** The server exposes destructive operations: deleting VMs, wiping disks, and running commands inside guests. Whatever the token can do, a connected AI client can ask for. Grant the minimum.
-- **Prefer API tokens** over passwords. They can be revoked on their own.
-- **Set `PROXMOX_VERIFY_SSL=true`** in production with valid certificates.
-- **Keep credentials out of version control**, and restrict network access to the API with firewall rules.
-
-<a id="a2a"></a>
-
-## 🤝 Agent-to-agent (A2A)
-
-[`agent-card.json`](agent-card.json) is this server's identity and capability manifest for other agents. It's generated from the tool registry, and lists **all 340 tools in 14 skill categories**, each with its name, description and inputs. It also covers authentication requirements and MCP protocol details.
-
-| Category | Tools | Category | Tools |
-|---|--:|---|--:|
-| `node_management` | 38 | `disk_management` | 17 |
-| `virtual_machine_management` | 46 | `ceph_management` | 33 |
-| `container_management` | 28 | `certificate_management` | 17 |
-| `storage_management` | 14 | `sdn_management` | 16 |
-| `cluster_management` | 37 | `notification_management` | 23 |
-| `access_control` | 33 | `pool_management` | 5 |
-| `firewall_management` | 31 | `appliances` | 2 |
-
-<details>
-<summary><b>Discover the agent's skills</b></summary>
-
-```python
-import json
-
-with open('agent-card.json') as f:
-    agent_card = json.load(f)
-
-print(f"Agent: {agent_card['name']}  Version: {agent_card['version']}")
-for skill in agent_card['skills']:
-    print(f"\n{skill['category']}:")
-    for capability in skill['capabilities']:
-        print(f"  - {capability['name']}: {capability['description']}")
-```
-</details>
-
-<details>
-<summary><b>Call its tools over MCP</b></summary>
-
-```python
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
-
-server_params = StdioServerParameters(
-    command="uv",
-    args=["--directory", "/path/to/proxmox-mcp-server", "run", "proxmox-mcp-server"],
-    env={
-        "PROXMOX_HOST": "192.168.1.100",
-        "PROXMOX_USER": "root@pam",
-        "PROXMOX_TOKEN_NAME": "automation",
-        "PROXMOX_TOKEN_VALUE": "your-token-value",
-    },
-)
-
-async with stdio_client(server_params) as (read, write):
-    async with ClientSession(read, write) as session:
-        await session.initialize()
-        tools = await session.list_tools()
-        result = await session.call_tool("list_vms", arguments={})
-        print(result.content)
-```
-</details>
-
-<details>
-<summary><b>Orchestrate it with other agents</b></summary>
-
-```python
-# Snapshot every VM, then hand off to other agents
-async def backup_workflow():
-    vms = await proxmox_agent.call_tool("list_vms", {})
-    for vm in vms['data']:
-        await proxmox_agent.call_tool("create_vm_snapshot", {
-            "node": vm['node'],
-            "vmid": vm['vmid'],
-            "snapname": f"backup-{datetime.now():%Y%m%d-%H%M%S}",
-        })
-    await storage_agent.call_tool("check_capacity", {})
-    await notification_agent.call_tool("send_alert", {"message": f"Backup completed: {len(vms['data'])} VMs"})
-```
-</details>
-
-<a id="troubleshooting"></a>
-
-## 🩺 Troubleshooting
-
-<details>
-<summary><b>Authentication errors</b></summary>
-
-- Double-check the credentials and that the user has the permissions you need.
-- For API tokens, make sure the token hasn't expired or been revoked.
-- If the token was created with *Privilege Separation* on, give the token its own permissions, or recreate it with that option off.
-</details>
-
-<details>
-<summary><b>Connection errors</b></summary>
-
-- Check `PROXMOX_HOST` (no scheme, no port) and `PROXMOX_PORT`.
-- Check you can reach the host: `curl -k https://YOUR_HOST:8006/api2/json/version`
-- If `PROXMOX_VERIFY_SSL=true`, the certificate must be valid for that host.
-</details>
-
-<details>
-<summary><b>Permission errors</b></summary>
-
-The user or token needs privileges for each operation. Common ones: `VM.Monitor`, `VM.Audit`, `Datastore.Audit`, `Sys.Audit`, `VM.PowerMgmt`, `VM.Snapshot`.
-</details>
-
-<details>
-<summary><b>Tools don't show up in Claude</b></summary>
-
-- The path in the config must be **absolute**.
-- The config file must be valid JSON.
-- Quit Claude Desktop completely and start it again.
-- Check Claude Desktop's logs. The server logs its authentication method and connection status to stderr, which shows up there.
-</details>
-
-<details>
-<summary><b>Check the connection before involving Claude</b></summary>
-
-```bash
-./test-connection.sh
+```sh
+uv venv -p 3.12 .venv
+uv pip install -p .venv -e . pytest pytest-asyncio ruff
+export PROXMOX_HOST=pve.example.internal
+export PROXMOX_TLS_FINGERPRINT=<sha256-of-the-proxmox-certificate>
+export PROXMOX_USER=dev@pve PROXMOX_TOKEN_NAME=mcp
+read -rs PROXMOX_TOKEN_VALUE && export PROXMOX_TOKEN_VALUE
+.venv/bin/proxmox-mcp-server
 ```
 
-It checks the connection, the API, authentication, permission to list nodes, and access to cluster resources.
-</details>
+The stdio server runs as the `local` identity. Its mode is `MCP_LOCAL_MODE`
+(default `ro`). Use a lab token with few privileges. Do not use stdio mode on the
+broker host.
 
-## 🛠️ Development
+## Tests
 
-```bash
-uv sync                          # dependencies, including dev tools
-uv run proxmox-mcp-server        # run the server directly
-uv run pytest                    # tests
-uv run ruff check . && uv run black .
+```sh
+.venv/bin/pytest -q --no-cov
+.venv/bin/ruff check proxmox_mcp tests
 ```
 
-```
-proxmox_mcp/
-├── server.py        MCP server entrypoint and tool registry
-├── client.py        Proxmox API client: token/password auth, read-only guard
-└── tools/           one module per API area:
-                     nodes, qemu, lxc, storage, cluster, access, firewall,
-                     disks, ceph, acme, sdn, notifications, pools, appliances
-docs/                the animations on this page
-agent-card.json      A2A agent card
-Dockerfile, docker-compose.yaml, setup.sh, test-connection.sh
-QUICKSTART.md · SETUP.md · USAGE.md · CHANGELOG.md
-```
+The tests run offline. The end-to-end tests (`tests/test_e2e_*.py`) start the real
+broker application with a temporary credentials directory and drive it as the
+Worker does. They execute every tool as `ro`, `operator` and `rw`, and check that:
 
-**Dependencies:**
-- **`mcp`** (>=1.0.0, <2): 2.x changed the server API and isn't supported yet.
-- **`httpx`**: the async HTTP client.
-- **`python-dotenv`**: loads `.env`.
+- the decision agrees with the tool tier;
+- a denied call never reaches Proxmox;
+- an allowed call reaches Proxmox only with the caller's own token, and makes the
+  same Proxmox calls as the upstream handler (`tests/fixtures/upstream_calls.json`);
+- each result has the untrusted-data label, and secrets and PHI are redacted;
+- the audit log has one line for each side, and the hash chain is intact.
 
-## 🗺️ Roadmap
+`tests/test_e2e_tls.py` uses a real local TLS server with a pinned self-signed
+certificate. With a wrong pin, no request byte reaches the server.
 
-- Streamable-HTTP transport, to run the server as a network service ([#24](https://github.com/ry-ops/proxmox-mcp-server/pull/24), [#29](https://github.com/ry-ops/proxmox-mcp-server/pull/29))
-- Support for `mcp` 2.x
-- Automatic ticket refresh for long-running password-authenticated sessions
-- A broader automated test suite
+## Documents
 
-What has shipped is in [CHANGELOG.md](CHANGELOG.md).
+| Document | Content |
+|---|---|
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Components, data path, trust boundaries. |
+| [docs/SECURITY.md](docs/SECURITY.md) | Threat model and risk register. |
+| [docs/COMPLIANCE.md](docs/COMPLIANCE.md) | HIPAA and SOC 2 control map with evidence. |
+| [docs/RUNBOOK.md](docs/RUNBOOK.md) | Installation, operation, incident response. |
+| [worker/README.md](worker/README.md) | The Cloudflare Worker. |
+| [USAGE.md](USAGE.md) | How Claude finds and runs tools. |
+| [CHANGELOG.md](CHANGELOG.md) | Changes by version. |
 
-## 🙌 Contributing
+## Changes from upstream
 
-Issues and pull requests are welcome: new tools, better error handling, performance, docs, tests and bug fixes.
+- The tool handlers are unchanged, with one fix: `analyze_schedule` uses GET, as
+  the Proxmox API defines it.
+- Removed: password and ticket authentication, `PROXMOX_VERIFY_SSL`, one shared
+  token for all users, and the stdio container as a deployment.
+- Added: the broker HTTP API, identity assertions, enrollment, tool tiers,
+  outbound policy, PHI filter, output redaction, the audit log and the
+  `worker/` gateway.
+- `setup.sh` and `test-connection.sh` no longer write or use secrets. They point
+  to the runbook.
+- `PROXMOX_READ_ONLY=true` still works. It is a kill switch for all writes on top
+  of the modes.
 
-## 📚 Learn more
+## Credits and license
 
-- [Proxmox VE API](https://pve.proxmox.com/wiki/Proxmox_VE_API) · [API viewer](https://pve.proxmox.com/pve-docs/api-viewer/) · [Admin guide](https://pve.proxmox.com/pve-docs/pve-admin-guide.html)
-- [Model Context Protocol](https://modelcontextprotocol.io/) · [MCP servers](https://github.com/modelcontextprotocol/servers) · [uv](https://github.com/astral-sh/uv)
+The Proxmox tools, their schemas and their handlers are the work of
+[ry-ops](https://github.com/ry-ops) in
+[proxmox-mcp-server](https://github.com/ry-ops/proxmox-mcp-server). Thank you.
 
-## License
-
-MIT. See [LICENSE](LICENSE).
-
-<!-- org-footer -->
----
-
-<p align="center"><sub>Part of <a href="https://github.com/ry-ops">ry-ops</a> · building the pipes between infrastructure, automation, and observability · built by <a href="https://github.com/ry-ops">ry-ops</a></sub></p>
+MIT license. See [LICENSE](LICENSE). The copyright notice of ry-ops stays in
+`LICENSE` and applies to the upstream code and to this fork.

@@ -1,30 +1,38 @@
+# Proxmox MCP broker: Linux LAB use only.
+#
+# Production runs on Windows Server 2025; follow docs/RUNBOOK.md. This file
+# replaces the upstream compose file, which passed a shared Proxmox token through
+# .env and turned TLS verification off.
+#
+# Before "docker compose up":
+#   1. Put enrollment.json, pve-token-<name> and worker-identity.pub in
+#      ./credentials, owned by uid 10001, mode 0400. Never commit that directory.
+#   2. Set the variables below in the shell or in .env (settings only, no secrets).
+#   3. Run cloudflared in this service's network namespace
+#      (network_mode: "service:broker"); the broker listens on 127.0.0.1 only.
 services:
-  proxmox-mcp-server:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: ghcr.io/ry-ops/proxmox-mcp-server:latest
-    container_name: proxmox-mcp-server
+  broker:
+    build: .
+    image: proxmox-mcp-broker:lab
     restart: unless-stopped
-    env_file:
-      - .env
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    # No "ports:" on purpose. Nothing is published to the host network.
     environment:
-      - PROXMOX_HOST=${PROXMOX_HOST:?set PROXMOX_HOST}
-      - PROXMOX_PORT=${PROXMOX_PORT:-8006}
-      - PROXMOX_USER=${PROXMOX_USER}
-      - PROXMOX_TOKEN_NAME=${PROXMOX_TOKEN_NAME}
-      - PROXMOX_TOKEN_VALUE=${PROXMOX_TOKEN_VALUE}
-      - PROXMOX_VERIFY_SSL=${PROXMOX_VERIFY_SSL:-false}
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-    # MCP servers communicate via stdio, not network ports
-    stdin_open: true
-    tty: true
-    healthcheck:
-      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
-    labels:
-      - "com.cortex.mcp-server=proxmox"
-      - "com.cortex.version=2.4.0"
+      PROXMOX_HOST: ${PROXMOX_HOST:?set PROXMOX_HOST}
+      PROXMOX_PORT: ${PROXMOX_PORT:-8006}
+      PROXMOX_TLS_FINGERPRINT: ${PROXMOX_TLS_FINGERPRINT:?set PROXMOX_TLS_FINGERPRINT}
+      CF_ACCESS_TEAM_DOMAIN: ${CF_ACCESS_TEAM_DOMAIN:?set CF_ACCESS_TEAM_DOMAIN}
+      CF_ACCESS_AUD: ${CF_ACCESS_AUD:?set CF_ACCESS_AUD}
+      BROKER_ALLOWED_SERVICE_CLIENT_IDS: ${BROKER_ALLOWED_SERVICE_CLIENT_IDS:?set BROKER_ALLOWED_SERVICE_CLIENT_IDS}
+      MCP_ALLOWED_HOSTS: ${MCP_ALLOWED_HOSTS:?set MCP_ALLOWED_HOSTS}
+      MCP_ALLOW_ADMIN_TOOLS: "0"
+    volumes:
+      - ./credentials:/run/credentials/proxmox-mcp:ro
+      - audit:/var/log/proxmox-mcp
+    tmpfs:
+      - /tmp
+
+volumes:
+  audit:
