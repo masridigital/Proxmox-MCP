@@ -3,9 +3,11 @@
 Stores one broker secret in C:\ProgramData\ProxmoxMCP\credentials as <Name>.dpapi.
 
 .DESCRIPTION
-The secret comes from stdin (piped) or from a hidden console prompt. It is never a
-parameter, so it never appears in command history, transcripts or process-creation
-events (4688 with command line).
+The secret comes from redirected stdin (an ssh pipe or "< file") or from a hidden console
+prompt. It is never a parameter, so it never appears in command history, transcripts,
+module logging or process-creation events (4688 with command line). Do not type a secret
+as a literal in a PowerShell pipeline ("'x' | ..."): PSReadLine history would keep it.
+The public key (not secret) can come from a file with -PublicKeyFile.
 
 Encryption: DPAPI, LocalMachine scope, plus the broker entropy file
 (credentials\dpapi-entropy.bin). This matches proxmox_mcp.credentials (ctypes
@@ -24,11 +26,11 @@ Known names and the checks applied:
 
 .EXAMPLE
 # From the Proxmox host straight into DPAPI. The token is never on disk or in argv:
-ssh root@pve.example.internal 'bash -s -- issue-token alice ro' < deploy/proxmox/setup-proxmox-access.sh |
-  ssh admin@broker.example.internal "pwsh -NoProfile -File 'C:\Program Files\ProxmoxMCP\scripts\Protect-BrokerCredential.ps1' -Name pve-token-alice"
+ssh root@<proxmox-host> 'MCP_POOL=<pool> bash -s -- issue-token <short> ro' < deploy/proxmox/setup-proxmox-access.sh |
+  ssh <admin>@<broker> "powershell.exe -NoProfile -NonInteractive -File 'C:\Program Files\ProxmoxMCP\scripts\Protect-BrokerCredential.ps1' -Name pve-token-<short>"
 
 .EXAMPLE
-Get-Content .\worker-identity.pub | .\Protect-BrokerCredential.ps1 -Name worker-identity.pub -NoEncrypt
+.\Protect-BrokerCredential.ps1 -Name worker-identity.pub -NoEncrypt -PublicKeyFile .\worker-identity.pub
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
@@ -36,6 +38,8 @@ param(
     [ValidateSet('Service', 'System', 'Administrators')][string]$Reader = 'Service',
     # Store as plain file (public key only). The ACL still applies.
     [switch]$NoEncrypt,
+    # worker-identity.pub only: read the PEM public key from this file instead of stdin.
+    [string]$PublicKeyFile,
     [switch]$Force
 )
 
@@ -57,7 +61,12 @@ if ((Test-Path -LiteralPath $target) -and -not $Force) {
     throw "$target exists. Pass -Force to replace it (rotation)."
 }
 
-$secret = Read-PmcSecret -Prompt "Value for $Name"
+if ($PublicKeyFile) {
+    if ($Name -ne 'worker-identity.pub' -or -not $NoEncrypt) { throw '-PublicKeyFile is only for -Name worker-identity.pub -NoEncrypt.' }
+    $secret = ([IO.File]::ReadAllText((Resolve-Path -LiteralPath $PublicKeyFile).Path)) -replace "(\r?\n)\z", ''
+} else {
+    $secret = Read-PmcSecret -Prompt "Value for $Name"
+}
 try {
     # ---- Validate the shape, never echo the value -------------------------------------
     switch -Regex ($Name) {
@@ -77,6 +86,10 @@ try {
                 throw 'audit-ship-sas must be a SAS with permissions sp=c only (create; no read, write, delete or list).'
             }
             if ($secret -notmatch '(^|[?&])spr=https(&|$)') { throw 'audit-ship-sas must be HTTPS-only (spr=https).' }
+            if ($secret -notmatch '(^|[?&])se=(\d{4}-\d{2}-\d{2})') { throw 'audit-ship-sas must carry an expiry (se=).' }
+            $exp = [datetime]::ParseExact($Matches[2], 'yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture)
+            if ($exp -gt (Get-Date).AddDays(366)) { throw 'audit-ship-sas expires in more than one year. Issue a shorter SAS.' }
+            if ([regex]::Matches($secret, '(^|[?&])sp=').Count -ne 1) { throw 'audit-ship-sas must have exactly one sp= field.' }
         }
         default { Write-Verbose "No shape check for $Name." }
     }
@@ -86,21 +99,14 @@ try {
     $bytes = [Text.Encoding]::UTF8.GetBytes($secret)
     try {
         if (-not $NoEncrypt) {
-            $blob = Protect-PmcBytes -Data $bytes
+            $blob = Protect-PmcData -Data $bytes
         } else {
             $blob = $bytes
         }
-        # Write next to the target, set the ACL, then replace: no window with a loose ACL.
-        $tmp = Join-Path $PmcCredDir ('.tmp-' + [guid]::NewGuid().ToString('N'))
-        [IO.File]::WriteAllBytes($tmp, $blob)
         $grants = @("$($SidAdmins):F", "$($SidSystem):F")
-        switch ($Reader) {
-            'Service' { $grants += "$($PmcServiceAccount):R" }
-            'System' { }
-            'Administrators' { }
-        }
-        Set-PmcAcl -Path $tmp -Grant $grants
-        Move-Item -LiteralPath $tmp -Destination $target -Force
+        if ($Reader -eq 'Service') { $grants += "$($PmcServiceAccount):R" }
+        # Write next to the target, set the ACL, then replace: no window with a loose ACL.
+        Write-PmcFileAtomic -Path $target -Bytes $blob -Grant $grants -Confirm:$false
         # Only one form may exist; the broker prefers .dpapi and a stale twin is confusing.
         if (Test-Path -LiteralPath $other) { Remove-Item -LiteralPath $other -Force }
     } finally {
@@ -108,6 +114,5 @@ try {
     }
 } finally {
     $secret = $null
-    [GC]::Collect()
 }
 Write-Step "Stored $target. Restart the broker to pick up a changed key: Restart-Service $PmcServiceName"

@@ -6,16 +6,27 @@
 # ACL equals the user ACL, so the token can never exceed the user. ACLs are scoped to a resource
 # pool (recommended) so the AI only sees the guests in that pool. root@pam is never touched.
 #
-# Roles (checked for PVE 9.x; VM.Monitor was dropped in libpve-access-control 9.0.2):
+# Roles (checked for PVE 9.x; VM.Monitor was dropped in libpve-access-control 9.0.2). Every role
+# is a subset of ALLOWED_PRIVILEGES in proxmox_mcp/selfcheck.py for the matching mode, so
+# `proxmox-mcp-selfcheck --live` passes:
 #   ProxmoxMCP-Read     VM.Audit Datastore.Audit Pool.Audit SDN.Audit Sys.Audit
+#                       + VM.GuestAgent.Audit where it exists (PVE 9: guest OS facts for the
+#                       read-tier vm_agent_get_* tools; never file content or command output)
 #   ProxmoxMCP-Operate  Read + VM.PowerMgmt VM.Snapshot
 #   ProxmoxMCP-Admin    Operate + guest-scoped config/allocate/clone/migrate/backup/rollback
+#   ProxmoxMCP-NodeAudit  Sys.Audit (+ Sys.Syslog with NODE_SYSLOG=1) on /nodes
 #   ProxmoxMCP-Review   Sys.Audit Pool.Audit   (quarterly access review token, read only)
-# Never granted (script refuses): Sys.Modify Sys.PowerMgmt Sys.Console Sys.Syslog Sys.Incoming
+# Never granted (script refuses): Sys.Modify Sys.PowerMgmt Sys.Console Sys.Incoming
 #   Sys.AccessNetwork Permissions.Modify Realm.* User.Modify Group.Allocate VM.Console
-#   VM.GuestAgent.* (guest content: agent exec, file read/write, user list) VM.Config.Cloudinit
-#   (user data can hold secrets) Datastore.Allocate Datastore.AllocateTemplate Mapping.*
-#   Pool.Allocate SDN.Allocate.
+#   VM.GuestAgent.Unrestricted/FileRead/FileWrite/FileSystemMgmt (guest content: agent exec,
+#   file read/write) VM.Config.Cloudinit (user data can hold secrets) Datastore.Allocate
+#   Datastore.AllocateTemplate Mapping.* Pool.Allocate SDN.Allocate. Sys.Syslog only on
+#   /nodes and only with NODE_SYSLOG=1 (host logs can name guests and users).
+#
+# Accountability: every run writes one line to syslog (tag proxmox-mcp-access, authpriv):
+# the command, its arguments, the login user and the SSH client address. Never a secret.
+# ACLs converge: every ProxmoxMCP-* ACL of the subject that is not wanted any more (old pool,
+# old mode, storage path, /nodes) is removed. root@pam and non-mcp users are never touched.
 #
 # Usage (as root on a Proxmox node; or remotely: ssh root@<pve> 'bash -s -- <cmd> ...' < this file):
 #   MCP_POOL=mcp ./setup-proxmox-access.sh roles               create/update roles and the pool
@@ -29,14 +40,15 @@
 #
 # Token delivery: the secret is printed once, to stdout only, and goes straight into the broker's
 # DPAPI store. It never touches a disk or a command line. From an admin workstation:
-#   ssh root@pve.example.internal 'MCP_POOL=mcp bash -s -- issue-token alice ro' < setup-proxmox-access.sh \
-#     | ssh admin@broker.example.internal "pwsh -NoProfile -File 'C:\Program Files\ProxmoxMCP\scripts\Protect-BrokerCredential.ps1' -Name pve-token-alice -Force"
+#   ssh root@<proxmox-host> 'MCP_POOL=mcp bash -s -- issue-token alice ro' < setup-proxmox-access.sh \
+#     | ssh <admin>@<broker> "powershell.exe -NoProfile -NonInteractive -File 'C:\Program Files\ProxmoxMCP\scripts\Protect-BrokerCredential.ps1' -Name pve-token-alice -Force"
 #
 # Variables:
 #   MCP_POOL         resource pool the AI may see (required for roles/user/issue-token unless ACL_PATHS set)
 #   ACL_PATHS        space-separated ACL paths (default "/pool/$MCP_POOL")
 #   STORAGE_PATHS    extra paths for operate/admin users, e.g. "/storage/<backup-storage>" (default none)
 #   NODE_AUDIT       1 = also grant Sys.Audit on /nodes (node status, task list). Default 1.
+#   NODE_SYSLOG      1 = also grant Sys.Syslog on /nodes (get_node_syslog/journal tools). Default 0.
 #   TOKEN_TTL_DAYS   token lifetime (default 90, max 365)
 #   ROTATE           1 = replace an existing token secret
 #   DRY_RUN          1 = print the pveum commands, change nothing, print no token
@@ -49,12 +61,21 @@ readonly ROLE_OPERATE="ProxmoxMCP-Operate"
 readonly ROLE_ADMIN="ProxmoxMCP-Admin"
 readonly ROLE_REVIEW="ProxmoxMCP-Review"
 readonly ROLE_NODE="ProxmoxMCP-NodeAudit"
-readonly PRIVS_READ="VM.Audit Datastore.Audit Pool.Audit SDN.Audit Sys.Audit"
+NODE_SYSLOG="${NODE_SYSLOG:-0}"
+# VM.GuestAgent.Audit exists from libpve-access-control 9.x on; older nodes reject it.
+GUEST_AUDIT=""
+if [[ -r /usr/share/perl5/PVE/AccessControl.pm ]] && grep -q "VM.GuestAgent.Audit" /usr/share/perl5/PVE/AccessControl.pm; then
+  GUEST_AUDIT=" VM.GuestAgent.Audit"
+fi
+readonly GUEST_AUDIT
+readonly PRIVS_READ="VM.Audit Datastore.Audit Pool.Audit SDN.Audit Sys.Audit${GUEST_AUDIT}"
 readonly PRIVS_OPERATE="${PRIVS_READ} VM.PowerMgmt VM.Snapshot"
 readonly PRIVS_ADMIN="${PRIVS_OPERATE} VM.Config.Disk VM.Config.CPU VM.Config.Memory VM.Config.Network VM.Config.Options VM.Config.HWType VM.Config.CDROM VM.Allocate VM.Clone VM.Migrate VM.Backup VM.Snapshot.Rollback Datastore.AllocateSpace SDN.Use"
 readonly PRIVS_REVIEW="Sys.Audit Pool.Audit"
-readonly PRIVS_NODE="Sys.Audit"
-readonly FORBIDDEN="Sys.Modify Sys.PowerMgmt Sys.Console Sys.Syslog Sys.Incoming Sys.AccessNetwork Permissions.Modify Realm.Allocate Realm.AllocateUser User.Modify Group.Allocate VM.Console VM.GuestAgent.Audit VM.GuestAgent.Unrestricted VM.GuestAgent.FileRead VM.GuestAgent.FileWrite VM.GuestAgent.FileSystemMgmt VM.Config.Cloudinit Datastore.Allocate Datastore.AllocateTemplate Mapping.Modify Mapping.Use Mapping.Audit Pool.Allocate SDN.Allocate"
+PRIVS_NODE="Sys.Audit"
+[[ "$NODE_SYSLOG" == "1" ]] && PRIVS_NODE="Sys.Audit Sys.Syslog"
+readonly PRIVS_NODE
+readonly FORBIDDEN="Sys.Modify Sys.PowerMgmt Sys.Console Sys.Incoming Sys.AccessNetwork Permissions.Modify Realm.Allocate Realm.AllocateUser User.Modify Group.Allocate VM.Console VM.GuestAgent.Unrestricted VM.GuestAgent.FileRead VM.GuestAgent.FileWrite VM.GuestAgent.FileSystemMgmt VM.Config.Cloudinit Datastore.Allocate Datastore.AllocateTemplate Mapping.Modify Mapping.Use Mapping.Audit Pool.Allocate SDN.Allocate"
 
 DRY_RUN="${DRY_RUN:-0}"
 NODE_AUDIT="${NODE_AUDIT:-1}"
@@ -65,6 +86,12 @@ ACL_PATHS="${ACL_PATHS:-}"
 STORAGE_PATHS="${STORAGE_PATHS:-}"
 
 log() { printf '%s\n' "$*" >&2; }
+
+# Who ran what, for the access-change audit trail (SOC 2 CC6.2, HIPAA 164.308(a)(4)).
+audit_trail() {
+  local who="${SUDO_USER:-$(logname 2>/dev/null || id -un)}" from="${SSH_CLIENT%% *}"
+  logger -t proxmox-mcp-access -p authpriv.notice -- "run by=${who} from=${from:-local} dry_run=${DRY_RUN} pool=${MCP_POOL:-} cmd=$*" 2>/dev/null || true
+}
 die() { log "error: $*"; exit 1; }
 
 # Run a pveum/pvesh command, or print it in dry-run. Never used for commands that return secrets.
@@ -152,18 +179,44 @@ cmd_roles() {
 user_exists() { pvesh get "/access/users/$1" --output-format json >/dev/null 2>&1; }
 token_exists() { pvesh get "/access/users/$1/token/${TOKEN_NAME}" --output-format json >/dev/null 2>&1; }
 
-# Set exactly one MCP role for a subject (user or token) on every path.
+# Print "<path> <role>" for every ProxmoxMCP-* ACL entry of one subject.
+# kind: user | token. Perl JSON::PP is part of every Proxmox VE node.
+mcp_acls_of() {
+  local kind="$1" subject="$2"
+  pveum acl list --output-format json | perl -MJSON::PP -e '
+    my $d = decode_json(join("", <STDIN>));
+    for my $e (@$d) {
+      next unless $e->{type} eq $ARGV[0] && $e->{ugid} eq $ARGV[1] && $e->{roleid} =~ /^ProxmoxMCP-/;
+      print "$e->{path} $e->{roleid}\n";
+    }' "$kind" "$subject"
+}
+
+# Converge the MCP ACLs of a subject (user or token) to exactly: $role on every path,
+# $role on STORAGE_PATHS (operate/admin only), the node role on /nodes (NODE_AUDIT=1).
+# Every other ProxmoxMCP-* entry of that subject is removed.
 set_acl() {
-  local kind="$1" subject="$2" role="$3" paths="$4" p other
-  for p in $paths; do
-    for other in "$ROLE_READ" "$ROLE_OPERATE" "$ROLE_ADMIN"; do
-      [[ "$other" == "$role" ]] || run pveum acl delete "$p" "--${kind}" "$subject" --roles "$other"
+  local kind="$1" subject="$2" role="$3" paths="$4" p want="" path r
+  for p in $paths; do want+="${p} ${role}"$'\n'; done
+  if [[ "$role" != "$ROLE_READ" && -n "$STORAGE_PATHS" ]]; then
+    for p in $STORAGE_PATHS; do
+      [[ "$p" =~ ^/storage/[A-Za-z0-9_.-]+$ ]] || die "STORAGE_PATHS entry '$p' must be /storage/<name>"
+      want+="${p} ${role}"$'\n'
     done
+  fi
+  [[ "$NODE_AUDIT" == "1" ]] && want+="/nodes ${ROLE_NODE}"$'\n'
+  local acl_type="user"; [[ "$kind" == "tokens" ]] && acl_type="token"
+  # Reading the ACL list is safe in DRY_RUN; only the deletes are printed instead of run.
+  while read -r path r; do
+    [[ -n "$path" ]] || continue
+    if ! grep -qxF "${path} ${r}" <<<"$want"; then
+      run pveum acl delete "$path" "--${kind}" "$subject" --roles "$r"
+    fi
+  done < <(mcp_acls_of "$acl_type" "$subject")
+  for p in $paths; do
     run pveum acl modify "$p" "--${kind}" "$subject" --roles "$role" --propagate 1
   done
   if [[ "$role" != "$ROLE_READ" && -n "$STORAGE_PATHS" ]]; then
     for p in $STORAGE_PATHS; do
-      [[ "$p" =~ ^/storage/[A-Za-z0-9_.-]+$ ]] || die "STORAGE_PATHS entry '$p' must be /storage/<name>"
       run pveum acl modify "$p" "--${kind}" "$subject" --roles "$role" --propagate 0
     done
   fi
@@ -207,6 +260,9 @@ emit_token() {
 new_token() {
   local userid="$1" comment="$2" exp json
   exp="$(expiry_epoch)"
+  # The user expires with the token: a forgotten user cannot outlive its key.
+  run pveum user modify "$userid" --expire "$exp"
+  log "token_expires=$(date -u -d "@${exp}" +%Y-%m-%d) (record it: Set-BrokerEnrollment.ps1 -TokenExpires <date>)"
   if [[ "$DRY_RUN" == "1" ]]; then
     log "DRY_RUN: pveum user token add ${userid} ${TOKEN_NAME} --privsep 1 --expire ${exp} (secret not shown)"
     return 0
@@ -258,16 +314,15 @@ mcp_users() {
 }
 
 revoke_user() {
-  local userid="$1" p role
+  local userid="$1" path role
   [[ "$userid" =~ ^mcp-[a-z0-9-]+@pve$ ]] || die "refusing to revoke '$userid'"
   if token_exists "$userid"; then run pveum user token delete "$userid" "$TOKEN_NAME"; fi
   run pveum user modify "$userid" --enable 0
-  # Remove MCP role ACLs for the user on every path where they appear.
-  for p in $(pveum acl list --output-format json | grep -o '"path" *: *"[^"]*"' | sed 's/.*"\([^"]*\)"$/\1/' | sort -u); do
-    for role in "$ROLE_READ" "$ROLE_OPERATE" "$ROLE_ADMIN" "$ROLE_REVIEW" "$ROLE_NODE"; do
-      run pveum acl delete "$p" --users "$userid" --roles "$role"
-    done
-  done
+  # Remove every ProxmoxMCP-* ACL of the user (token ACLs go with the token).
+  while read -r path role; do
+    [[ -n "$path" ]] || continue
+    run pveum acl delete "$path" --users "$userid" --roles "$role"
+  done < <(mcp_acls_of user "$userid")
   log "revoked ${userid}: token deleted, user disabled, ACLs removed"
 }
 
@@ -282,8 +337,9 @@ cmd_list() {
 
 main() {
   local cmd="${1:-}"
-  shift || true
   require_pve
+  audit_trail "$@"
+  shift || true
   case "$cmd" in
     roles) cmd_roles ;;
     user) [[ $# -eq 2 ]] || die "usage: user <short> <ro|operator|rw>"; cmd_user "$1" "$2" ;;

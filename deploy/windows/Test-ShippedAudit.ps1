@@ -17,7 +17,7 @@ Get the inputs with a reader identity (never the shipping credential, which cann
 
 .EXAMPLE
 .\Test-ShippedAudit.ps1 -BlobListJson .\blobs.json -DownloadDir .\dl -KeyFile .\audit-hmac.key -Anchor <seq>:<hash> `
-  -VerifyExe 'C:\Program Files\ProxmoxMCP\venv\Scripts\proxmox-mcp-audit-verify.exe'
+  -VerifyExe <path of proxmox-mcp-audit-verify.exe from a verifier venv built from the same release>
 #>
 [CmdletBinding()]
 param(

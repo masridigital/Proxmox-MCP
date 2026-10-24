@@ -9,6 +9,8 @@ Writes a dated folder (default C:\ProgramData\ProxmoxMCP\evidence\access-review-
   enrollment.csv             email, mode, Proxmox user, token credential, token stored
   proxmox-access.json        ACLs, users (enabled, expiry, tokens), roles, pools (API, GET only)
   cloudflare-access.json     Access apps and policies for the Worker (and broker) hostname
+  selfcheck-live.json        proxmox-mcp-selfcheck --live: each token's effective privileges
+                             checked against its mode (SOC 2 CC6.3 evidence)
   crosscheck.csv             one row per person across the three sources, with findings
   SHA256SUMS.txt             hash of every file above
 The reviewer signs off by recording the folder hash in the ticket (docs/COMPLIANCE.md).
@@ -19,9 +21,9 @@ setup-proxmox-access.sh review-token), and a Cloudflare API token with
 "Access: Apps and Policies Read" only, read from stdin or a hidden prompt.
 
 .EXAMPLE
-.\Export-AccessReview.ps1 -AccountId <account id> -WorkerHostname mcp.example.com
+.\Export-AccessReview.ps1 -AccountId <account id> -WorkerHostname <worker-hostname>
 #>
-[CmdletBinding()]
+[CmdletBinding(SupportsShouldProcess)]
 param(
     [Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{32}$')][string]$AccountId,
     [Parameter(Mandatory)][string]$WorkerHostname,
@@ -35,12 +37,31 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'ProxmoxMcp.Common.ps1')
 Assert-Administrator
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+Initialize-PmcTlsProtocol
+if ($WorkerHostname -cnotmatch '^[a-z0-9.-]{1,253}$') { throw '-WorkerHostname must be a lower-case host name.' }
+if ($BrokerHostname -and $BrokerHostname -cnotmatch '^[a-z0-9.-]{1,253}$') { throw '-BrokerHostname must be a lower-case host name.' }
 
 $day = Get-Date -Format 'yyyy-MM-dd'
 $dir = Join-Path $OutputRoot "access-review-$day"
-New-Item -ItemType Directory -Path $dir -Force | Out-Null
-Set-PmcAcl -Path $OutputRoot -Grant @("$($SidAdmins):(OI)(CI)F", "$($SidSystem):(OI)(CI)F")
+if (-not $PSCmdlet.ShouldProcess($dir, 'Write access review evidence')) { return }
+New-PmcDirectory -Path $OutputRoot -Confirm:$false
+Set-PmcAcl -Path $OutputRoot -Grant @("$($SidAdmins):(OI)(CI)F", "$($SidSystem):(OI)(CI)F") -Confirm:$false
+New-PmcDirectory -Path $dir -Confirm:$false
+if (@(Get-ChildItem -LiteralPath $dir -Force).Count -gt 0) { throw "$dir is not empty. Move the earlier export away first (evidence is never overwritten)." }
+
+function Invoke-CfGet {
+    # GET with the read-only Cloudflare token from $script:CfToken. .NET only: the token is
+    # never bound to a cmdlet parameter, so module logging cannot record it.
+    param([Parameter(Mandatory)][string]$Url)
+    $req = [Net.HttpWebRequest]::Create($Url)
+    $req.Method = 'GET'; $req.Timeout = 30000; $req.AllowAutoRedirect = $false
+    $req.Headers.Add('Authorization', "Bearer $($script:CfToken)")
+    $resp = $req.GetResponse()
+    try { $body = (New-Object IO.StreamReader($resp.GetResponseStream())).ReadToEnd() } finally { $resp.Dispose() }
+    $doc = $body | ConvertFrom-Json
+    if (-not $doc.success) { throw "Cloudflare API call failed: $Url" }
+    return $doc
+}
 
 # ---- 1. Enrollment -------------------------------------------------------------------------
 $enrPath = Join-Path $PmcCredDir 'enrollment.json'
@@ -58,15 +79,16 @@ $rows | Export-Csv -NoTypeInformation -LiteralPath (Join-Path $dir 'enrollment.c
 $pve = $null
 if (-not $SkipProxmox) {
     $envMap = Read-PmcEnvFile
-    $vpy = Join-Path $PmcVenvDir 'Scripts\python.exe'
+    $vpy = Get-PmcTool -Name python
     $dump = Join-Path $PmcScriptsDir 'pve_access_dump.py'
     $saved = @{}
     foreach ($k in @('PROXMOX_HOST', 'PROXMOX_PORT', 'PROXMOX_TLS_FINGERPRINT', 'PROXMOX_CA_BUNDLE')) {
         $saved[$k] = [Environment]::GetEnvironmentVariable($k, 'Process')
-        $v = ''
+        $v = $null
         if ($envMap.Contains($k)) { $v = $envMap[$k] }
         [Environment]::SetEnvironmentVariable($k, $v, 'Process')
     }
+    foreach ($k in @('BROKER_CREDENTIALS_DIR', 'BROKER_DPAPI_ENTROPY_FILE')) { $saved[$k] = [Environment]::GetEnvironmentVariable($k, 'Process') }
     [Environment]::SetEnvironmentVariable('BROKER_CREDENTIALS_DIR', $PmcCredDir, 'Process')
     [Environment]::SetEnvironmentVariable('BROKER_DPAPI_ENTROPY_FILE', $PmcEntropyFile, 'Process')
     try {
@@ -83,23 +105,34 @@ if (-not $SkipProxmox) {
 # ---- 3. Cloudflare Access (read-only token from stdin / prompt) --------------------------
 $cfDoc = [ordered]@{ apps = @() }
 if (-not $SkipCloudflare) {
-    $tok = Read-PmcSecret -Prompt 'Cloudflare API token (Access: Apps and Policies Read)'
+    $script:CfToken = Read-PmcSecret -Prompt 'Cloudflare API token (Access: Apps and Policies Read)'
     try {
-        $h = @{ Authorization = "Bearer $tok" }
         foreach ($hn in @($WorkerHostname, $BrokerHostname)) {
             if (-not $hn) { continue }
-            $u = "https://api.cloudflare.com/client/v4/accounts/$AccountId/access/apps?domain=$([uri]::EscapeDataString($hn))"
-            $apps = Invoke-RestMethod -UseBasicParsing -Uri $u -Headers $h -TimeoutSec 30
+            $apps = Invoke-CfGet -Url "https://api.cloudflare.com/client/v4/accounts/$AccountId/access/apps?domain=$([uri]::EscapeDataString($hn))"
             foreach ($a in @($apps.result | Where-Object { $_.domain -eq $hn })) {
-                $pu = "https://api.cloudflare.com/client/v4/accounts/$AccountId/access/apps/$($a.id)/policies"
-                $pol = Invoke-RestMethod -UseBasicParsing -Uri $pu -Headers $h -TimeoutSec 30
+                $pol = Invoke-CfGet -Url "https://api.cloudflare.com/client/v4/accounts/$AccountId/access/apps/$($a.id)/policies"
                 $cfDoc.apps += [ordered]@{ id = $a.id; name = (Get-PmcProp $a 'name'); domain = $a.domain
                     session_duration = (Get-PmcProp $a 'session_duration'); allowed_idps = (Get-PmcProp $a 'allowed_idps')
                     oauth_configuration = (Get-PmcProp $a 'oauth_configuration'); policies = @($pol.result) }
             }
         }
-    } finally { $tok = $null; $h = $null }
+    } finally { $script:CfToken = $null }
     ($cfDoc | ConvertTo-Json -Depth 12) | Set-Content -LiteralPath (Join-Path $dir 'cloudflare-access.json') -Encoding UTF8
+}
+
+# ---- 3b. Least privilege, measured: proxmox-mcp-selfcheck --live ----------------------------
+$live = $null
+if (-not $SkipProxmox) {
+    $sc = Invoke-PmcBrokerTool -Tool 'proxmox-mcp-selfcheck' -ArgumentList @('--live')
+    Set-Content -LiteralPath (Join-Path $dir 'selfcheck-live.json') -Value $sc.Output -Encoding UTF8
+    try { $live = $sc.Output | ConvertFrom-Json } catch { Write-Warning 'selfcheck output is not JSON.' }
+    if ($sc.Code -ge 2) { Write-Warning "proxmox-mcp-selfcheck --live exit $($sc.Code): see selfcheck-live.json." }
+}
+$expiryMap = @{}
+if (Test-Path -LiteralPath $PmcExpiryFile) {
+    $ej = Get-Content -LiteralPath $PmcExpiryFile -Raw | ConvertFrom-Json
+    foreach ($p in $ej.PSObject.Properties) { $expiryMap[$p.Name] = [string]$p.Value }
 }
 
 # ---- 4. Cross-check ----------------------------------------------------------------------
@@ -143,10 +176,22 @@ foreach ($e in ($all.Keys | Sort-Object)) {
             elseif ([DateTimeOffset]::FromUnixTimeSeconds([int64]$exp) -lt [DateTimeOffset]::UtcNow.AddDays(14)) { $findings += "token $($t.tokenid) expires within 14 days" }
         }
     }
+    if ($r -and $live) {
+        foreach ($c in @($live.checks | Where-Object { $_.id -eq "live:$e" -or $_.id -eq "token:$e" -or $_.id -eq "token_expiry:$e" })) {
+            if ($c.status -in @('fail', 'warn')) { $findings += "selfcheck $($c.id): $($c.message)" }
+        }
+    }
+    $recorded = ''
+    if ($r) {
+        $enrEntry = Get-PmcProp $enr.users $e
+        $recorded = [string](Get-PmcProp $enrEntry 'token_expires')
+        if (-not $recorded -and $expiryMap.ContainsKey($e)) { $recorded = $expiryMap[$e] }
+        if (-not $recorded) { $findings += 'token expiry not recorded (Set-BrokerEnrollment.ps1 -TokenExpires)' }
+    }
     $mode = ''; $uid = ''
     if ($r) { $mode = $r.mode; $uid = $r.proxmox_userid }
     $cross += [pscustomobject]@{ email = $e; mode = $mode; proxmox_userid = $uid; in_access_policy = $accessEmails.ContainsKey($e)
-        token_expiry = $tokExp; findings = ($findings -join '; ') }
+        token_expiry = $tokExp; token_expires_recorded = $recorded; findings = ($findings -join '; ') }
 }
 $cross | Export-Csv -NoTypeInformation -LiteralPath (Join-Path $dir 'crosscheck.csv')
 
