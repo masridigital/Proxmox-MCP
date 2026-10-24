@@ -30,6 +30,12 @@ const NOTIFICATION_METHODS = new Set(["notifications/initialized", "notification
 
 export type RpcId = string | number | null;
 
+/** Method name for the audit log: allowlisted names verbatim, anything else "other" (a
+ *  free-form method string is caller-controlled text and could carry PHI). */
+export function auditMethodName(method: string): string {
+  return REQUEST_METHODS.has(method) || NOTIFICATION_METHODS.has(method) ? method : "other";
+}
+
 export class RpcError extends Error {
   constructor(
     public code: number,

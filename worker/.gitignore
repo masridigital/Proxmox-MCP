@@ -3,3 +3,5 @@ dist/
 .wrangler/
 .dev.vars
 *.key
+# The repository root ignores lockfiles; the Worker pins its dev toolchain with one.
+!package-lock.json

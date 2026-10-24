@@ -4,7 +4,7 @@
 // /v1/execute (final authority).
 
 import { BrokerError, type BrokerContext, type BrokerCallInfo, type Catalog, type CatalogTool, TOOL_NAME_RE, executeTool, fetchCatalog } from "./broker";
-import { renderBrokerText } from "./output";
+import { redactPhi, renderBrokerResult, safeJson } from "./output";
 import { canonicalJson, cleanText, isPlainObject, sha256Hex } from "./util";
 
 export const LIST_CAP = 50;
@@ -94,6 +94,17 @@ export interface ToolAudit {
 
 const text = (t: string, isError = false): ToolResult => ({ content: [{ type: "text", text: t }], isError });
 
+const AUDIT_KEY_RE = /^[A-Za-z0-9_.-]{1,64}$/;
+
+/** Argument keys for the audit line: identifiers only, never PHI-shaped text. */
+function auditKeys(obj: Record<string, unknown>): string[] {
+  return Object.keys(obj)
+    .slice(0, 200)
+    .map((k) => (AUDIT_KEY_RE.test(k) && redactPhi(k, { contact: true }) === k ? k : "[key]"))
+    .sort()
+    .slice(0, 50);
+}
+
 // ------------------------------------------------------------------------- catalog cache
 
 const catalogCache = new Map<string, { at: number; catalog: Catalog }>();
@@ -163,20 +174,30 @@ function listTools(catalog: Catalog, args: Record<string, unknown>): ToolResult 
       .slice(0, 60)
       .map(([c, names]) => ({ category: c, tools: names.length, examples: names.slice(0, 4) }));
     return text(
-      JSON.stringify(
-        { note: "Call list_tools again with 1 to 3 search_terms to get tool names.", visible_tools: catalog.tools.length, categories },
-        null,
-        1,
-      ),
+      safeJson({ note: "Call list_tools again with 1 to 3 search_terms to get tool names.", visible_tools: catalog.tools.length, categories }, 1),
     );
   }
+  // Literal, case-insensitive substring per field (name OR description), terms OR-ed. No
+  // regex is built from caller input, and a term cannot match across the field boundary.
   const hits = catalog.tools
-    .filter((t) => terms.some((term) => `${t.name} ${t.description}`.toLowerCase().includes(term)))
+    .filter((t) => {
+      const name = t.name.toLowerCase();
+      const desc = t.description.toLowerCase();
+      return terms.some((term) => name.includes(term) || desc.includes(term));
+    })
     .map((t) => ({ name: t.name, description: t.description }));
   if (hits.length > LIST_CAP) {
-    return text(JSON.stringify({ note: `${hits.length} tools match; showing ${LIST_CAP}. Narrow your terms.`, tools: hits.slice(0, LIST_CAP) }, null, 1));
+    // content[0] keeps the STD-02 shape (a JSON array of {name, description}); the note is a
+    // separate text item.
+    return {
+      content: [
+        { type: "text", text: safeJson(hits.slice(0, LIST_CAP), 1) },
+        { type: "text", text: `${hits.length} tools match; showing ${LIST_CAP}. Narrow your terms.` },
+      ],
+      isError: false,
+    };
   }
-  return text(JSON.stringify(hits, null, 1));
+  return text(safeJson(hits, 1));
 }
 
 function describeTools(catalog: Catalog, args: Record<string, unknown>): ToolResult {
@@ -188,7 +209,9 @@ function describeTools(catalog: Catalog, args: Record<string, unknown>): ToolRes
     const t = byName.get(n);
     if (!t) return `Unknown tool: ${n}`; // hidden and nonexistent tools look the same
     known++;
-    return `<input_schema tool="${n}">\n${JSON.stringify(t.inputSchema, null, 2)}\n</input_schema>`;
+    // n matches TOOL_NAME_RE (no quotes); the schema JSON has "<" and ">" \u-escaped so text
+    // inside it cannot forge an </input_schema> delimiter.
+    return `<input_schema tool="${n}">\n${safeJson(t.inputSchema, 2)}\n</input_schema>`;
   });
   return text(known ? blocks.join("\n") : blocks.join("; "), known === 0);
 }
@@ -208,10 +231,10 @@ export async function callMetaTool(name: string, rawArgs: unknown, deps: CallDep
       const toolArgs = args.arguments === undefined ? {} : args.arguments;
       if (!isPlainObject(toolArgs)) throw new InputError("arguments: expected object");
       audit.target = args.name;
-      audit.arg_keys = Object.keys(toolArgs).sort().slice(0, 50);
+      audit.arg_keys = auditKeys(toolArgs);
       audit.args_sha256 = await sha256Hex(canonicalJson(toolArgs));
     } else {
-      audit.arg_keys = Object.keys(args).sort().slice(0, 50);
+      audit.arg_keys = auditKeys(args);
       audit.args_sha256 = await sha256Hex(canonicalJson(args));
     }
   } catch (e) {
@@ -233,7 +256,8 @@ export async function callMetaTool(name: string, rawArgs: unknown, deps: CallDep
     const info: BrokerCallInfo = { status: 0, jti: "", bytes: 0 };
     try {
       const result = await executeTool(deps.ctx, target, (args.arguments ?? {}) as Record<string, unknown>, info);
-      return text(renderBrokerText(target, result.text), !result.ok);
+      const out = renderBrokerResult(target, result.text, result.ok, { contact: deps.ctx.config.phiContact });
+      return text(out.text, out.isError);
     } finally {
       audit.broker_status = info.status;
       audit.broker_jti = info.jti;

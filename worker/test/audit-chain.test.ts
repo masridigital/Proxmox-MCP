@@ -21,12 +21,12 @@ function setup() {
 describe("AuditChain Durable Object", () => {
   it("hash-chains records and ships them to R2 on the alarm", async () => {
     const { state, objects, chain, append } = setup();
-    for (let i = 0; i < 5; i++) expect((await append({ event: "request", user: "a@x.com", i })).status).toBe(204);
+    for (let i = 0; i < 5; i++) expect((await append({ ts: "2026-10-24T01:02:03.000Z", event: "request", user: "a@x.com", i })).status).toBe(204);
     expect(await state.storage.getAlarm()).not.toBeNull();
     await chain.alarm();
     expect(objects.size).toBe(1);
     const [key, body] = [...objects.entries()][0]!;
-    expect(key).toMatch(/^worker-audit\/\d{4}\/\d{2}\/\d{2}\/000000000001-000000000005\.jsonl$/);
+    expect(key).toBe("worker-audit/2026/10/24/000000000001-000000000005.jsonl");
     const lines = body.trim().split("\n");
     expect(lines).toHaveLength(5);
     expect(await verifyChain(lines)).toBe(0);
@@ -51,12 +51,17 @@ describe("AuditChain Durable Object", () => {
     expect(await verifyChain([lines[1]!, lines[0]!, lines[2]!, lines[3]!])).toBeGreaterThan(0);
   });
 
-  it("keeps pending records when the R2 write fails", async () => {
-    const state = memoryState();
-    const chain = new AuditChain(state as never, { AUDIT_BUCKET: { put: async () => { throw new Error("r2 down"); } } });
-    await chain.fetch(new Request("https://audit-chain/append", { method: "POST", body: '{"event":"x"}' }));
-    await expect(chain.alarm()).rejects.toThrow("r2 down");
-    expect((await state.storage.list({ prefix: "p:" })).size).toBe(1);
+  it("flushes more than 128 lines (Durable Object delete limit) in one batch", async () => {
+    const { state, objects, chain, append } = setup();
+    const del = state.storage.delete.bind(state.storage);
+    state.storage.delete = async (keys: string[]) => {
+      if (keys.length > 128) throw new Error("too many keys");
+      return del(keys);
+    };
+    for (let i = 0; i < 300; i++) await append({ event: "request", i });
+    await chain.alarm();
+    expect(objects.size).toBe(1);
+    expect((await state.storage.list({ prefix: "p:" })).size).toBe(0);
   });
 
   it("rejects non-object and oversize records", async () => {

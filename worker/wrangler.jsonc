@@ -30,7 +30,9 @@
     "ALLOWED_EMAILS": "",
     "ALLOWED_EMAIL_DOMAINS": "",
     "ALLOWED_ORIGINS": "",
-    "RATE_PER_DAY": "2000"
+    "RATE_PER_DAY": "2000",
+    // "1" also redacts emails and phone numbers in results (broker: MCP_PHI_CONTACT=1)
+    "PHI_CONTACT": ""
   },
   // Secrets (wrangler secret put <NAME>; never in this file):
   //   IDENTITY_SIGNING_KEY         Ed25519 private key, PKCS8 PEM (broker holds the public key)
