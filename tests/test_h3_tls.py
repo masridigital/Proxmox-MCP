@@ -60,7 +60,11 @@ def _make_cert(d, stem):
     key_pem = d / f"{stem}.key"
     cert_pem.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
     key_pem.write_bytes(
-        key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption())
+        key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        )
     )
     fp = hashlib.sha256(cert.public_bytes(serialization.Encoding.DER)).hexdigest()
     return SimpleNamespace(cert=str(cert_pem), key=str(key_pem), fp=fp)
@@ -104,7 +108,11 @@ async def tls_server(cert, *, host="127.0.0.1", tweak=None, keepalive=False):
             conn = b"keep-alive" if keepalive else b"close"
             writer.write(
                 b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: "
-                + str(len(body)).encode() + b"\r\nConnection: " + conn + b"\r\n\r\n" + body
+                + str(len(body)).encode()
+                + b"\r\nConnection: "
+                + conn
+                + b"\r\n\r\n"
+                + body
             )
             await writer.drain()
             if not keepalive:
@@ -127,7 +135,9 @@ def make_client(monkeypatch, port, *, host="127.0.0.1", pin="", ca="", insecure=
     monkeypatch.setattr(client_mod, "PROXMOX_CA_BUNDLE", ca)
     monkeypatch.setattr(client_mod, "PROXMOX_INSECURE_TLS", insecure)
     monkeypatch.setattr(client_mod, "PROXMOX_READ_ONLY", False)
-    monkeypatch.setattr(client_mod, "require_identity", lambda: Identity("alice@example.com", "user"))
+    monkeypatch.setattr(
+        client_mod, "require_identity", lambda: Identity("alice@example.com", "user")
+    )
     monkeypatch.setattr(client_mod.ProxmoxClient, "resolve_auth", lambda self, i: ("ro", TOKEN))
     monkeypatch.setattr(client_mod.audit, "audit_event", lambda **f: None)
     return client_mod.ProxmoxClient()
@@ -281,7 +291,9 @@ async def test_ip_literal_sends_no_sni_and_verifies_ip_san(monkeypatch, certs):
 
 async def test_ca_bundle_with_correct_pin_succeeds(monkeypatch, certs):
     async with tls_server(certs.good) as srv:
-        c = make_client(monkeypatch, srv.port, host="localhost", ca=certs.good.cert, pin=certs.good.fp)
+        c = make_client(
+            monkeypatch, srv.port, host="localhost", ca=certs.good.cert, pin=certs.good.fp
+        )
         try:
             assert await c.get("/version") == {"data": "ok"}
         finally:
@@ -291,8 +303,12 @@ async def test_ca_bundle_with_correct_pin_succeeds(monkeypatch, certs):
 async def test_ca_bundle_hostname_mismatch_refused_even_with_correct_pin(monkeypatch, certs):
     async with tls_server(certs.good) as srv:
         # "127.0.0.2" is not in the SAN; with a CA bundle the hostname check stays on.
-        monkeypatch.setattr(client_mod.httpcore.AnyIOBackend, "connect_tcp", _redirect_to(srv.port, "127.0.0.1"))
-        c = make_client(monkeypatch, srv.port, host="127.0.0.2", ca=certs.good.cert, pin=certs.good.fp)
+        monkeypatch.setattr(
+            client_mod.httpcore.AnyIOBackend, "connect_tcp", _redirect_to(srv.port, "127.0.0.1")
+        )
+        c = make_client(
+            monkeypatch, srv.port, host="127.0.0.2", ca=certs.good.cert, pin=certs.good.fp
+        )
         try:
             with pytest.raises(httpx.ConnectError):
                 await c.get("/version")
@@ -305,8 +321,17 @@ async def test_ca_bundle_hostname_mismatch_refused_even_with_correct_pin(monkeyp
 def _redirect_to(port, host="127.0.0.1"):
     real = httpcore.AnyIOBackend.connect_tcp
 
-    async def connect_tcp(self, _host, _port, timeout=None, local_address=None, socket_options=None):
-        return await real(self, host, port, timeout=timeout, local_address=local_address, socket_options=socket_options)
+    async def connect_tcp(
+        self, _host, _port, timeout=None, local_address=None, socket_options=None
+    ):
+        return await real(
+            self,
+            host,
+            port,
+            timeout=timeout,
+            local_address=local_address,
+            socket_options=socket_options,
+        )
 
     return connect_tcp
 
@@ -334,7 +359,9 @@ async def test_ipv6_literal_host(monkeypatch, certs, mode):
 
 
 @pytest.mark.parametrize("mode", ["pin", "ca"])
-async def test_dns_rebinding_to_another_peer_never_gets_the_token(monkeypatch, certs, mode, tmp_path):
+async def test_dns_rebinding_to_another_peer_never_gets_the_token(
+    monkeypatch, certs, mode, tmp_path
+):
     # The name resolves to the attacker between connects. The attacker's cert is valid
     # for the name but chains to nothing we trust and has another fingerprint. Even with
     # SSL_CERT_FILE pointing at the attacker's cert, a configured CA bundle wins.
@@ -346,7 +373,9 @@ async def test_dns_rebinding_to_another_peer_never_gets_the_token(monkeypatch, c
             assert await c.get("/version") == {"data": "ok"}
             await c.client.aclose()  # drop the pool: the next request reconnects
             c = make_client(monkeypatch, good.port, host="localhost", **kwargs)
-            monkeypatch.setattr(client_mod.httpcore.AnyIOBackend, "connect_tcp", _redirect_to(evil.port))
+            monkeypatch.setattr(
+                client_mod.httpcore.AnyIOBackend, "connect_tcp", _redirect_to(evil.port)
+            )
             with pytest.raises(httpx.ConnectError):
                 await c.get("/version")
         finally:
@@ -413,4 +442,6 @@ async def test_tls_failures_log_no_secret(monkeypatch, certs, caplog):
     text = "\n".join(f"{r.name} {r.getMessage()}" for r in caplog.records)
     assert caplog.records  # httpx/httpcore did log at DEBUG
     assert SECRET not in text and "PVEAPIToken" not in text and "QSMARKER" not in text
-    assert SECRET not in str(ei.value) and "authorization" not in {k.lower() for k in ei.value.request.headers}
+    assert SECRET not in str(ei.value) and "authorization" not in {
+        k.lower() for k in ei.value.request.headers
+    }

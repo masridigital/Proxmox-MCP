@@ -81,8 +81,17 @@ def test_hard_link_refused(creddir, tmp_path):
 
 
 def _fake_stat(**kw):
-    base = {"st_mode": stat.S_IFREG | 0o400, "st_size": 10, "st_uid": 0, "st_nlink": 1, "st_dev": 1,
-            "st_ino": 7, "st_mtime_ns": 1, "st_ctime_ns": 1, "st_file_attributes": 0}
+    base = {
+        "st_mode": stat.S_IFREG | 0o400,
+        "st_size": 10,
+        "st_uid": 0,
+        "st_nlink": 1,
+        "st_dev": 1,
+        "st_ino": 7,
+        "st_mtime_ns": 1,
+        "st_ctime_ns": 1,
+        "st_file_attributes": 0,
+    }
     base.update(kw)
     return SimpleNamespace(**base)
 
@@ -172,9 +181,26 @@ def test_token_header_has_no_crlf_and_repr_hides_secret():
 
 @pytest.mark.parametrize(
     "host",
-    ["pve\n", "pve.example.internal\n", "2130706433", "999.1.1.1", "0x7f.1", "fe80::1%eth0",
-     "-pve", "pve-", "pve_x", "a..b", "pve.", "", "pve:8006", "user@pve", "pve/x", "[::1]",
-     "pеve", "a" * 64 + ".example"],
+    [
+        "pve\n",
+        "pve.example.internal\n",
+        "2130706433",
+        "999.1.1.1",
+        "0x7f.1",
+        "fe80::1%eth0",
+        "-pve",
+        "pve-",
+        "pve_x",
+        "a..b",
+        "pve.",
+        "",
+        "pve:8006",
+        "user@pve",
+        "pve/x",
+        "[::1]",
+        "pеve",
+        "a" * 64 + ".example",
+    ],
 )
 def test_bad_hosts_rejected(host):
     with pytest.raises(ValueError, match="PROXMOX_HOST"):

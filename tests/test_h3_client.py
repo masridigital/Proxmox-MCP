@@ -69,7 +69,9 @@ def env(monkeypatch, creddir, tmp_path):
     put(creddir, "pve-token-alice", f"mcp-alice@pve!mcp={SECRET}\n")
     put(creddir, "pve-token-bob", f"mcp-bob@pve!mcp={SECRET_B}\n")
     table = {
-        "alice@example.com": FakeEnrollment("alice@example.com", "rw", "mcp-alice@pve", "pve-token-alice"),
+        "alice@example.com": FakeEnrollment(
+            "alice@example.com", "rw", "mcp-alice@pve", "pve-token-alice"
+        ),
         "bob@example.com": FakeEnrollment("bob@example.com", "rw", "mcp-bob@pve", "pve-token-bob"),
     }
 
@@ -128,7 +130,17 @@ async def test_invalid_parameter_names_refused(env, key):
 
 @pytest.mark.parametrize(
     "value",
-    [{"nested": "dict"}, [{"a": 1}], [["x"]], object(), b"bytes", float("nan"), float("inf"), "a\x00b", "a\x1bb"],
+    [
+        {"nested": "dict"},
+        [{"a": 1}],
+        [["x"]],
+        object(),
+        b"bytes",
+        float("nan"),
+        float("inf"),
+        "a\x00b",
+        "a\x1bb",
+    ],
 )
 async def test_unencodable_values_refused(env, value):
     with pytest.raises(PermissionError, match="invalid request parameter memory"):
@@ -139,7 +151,9 @@ async def test_unencodable_values_refused(env, value):
 
 async def test_crlf_only_in_free_text_fields(env):
     with pytest.raises(PermissionError, match="invalid request parameter net0"):
-        await env.c.put("/nodes/pve/qemu/100/config", {"net0": "virtio,bridge=vmbr0\nhostpci0: 01:00"})
+        await env.c.put(
+            "/nodes/pve/qemu/100/config", {"net0": "virtio,bridge=vmbr0\nhostpci0: 01:00"}
+        )
     assert env.sent == []
     await env.c.put("/nodes/pve/qemu/100/config", {"description": "line one\r\nline two"})
     assert dict(parse_qsl(env.sent[-1].content.decode())) == {"description": "line one\r\nline two"}
@@ -148,15 +162,27 @@ async def test_crlf_only_in_free_text_fields(env):
 async def test_form_body_encoding(env):
     await env.c.put(
         "/nodes/pve/qemu/100/config",
-        {"onboot": True, "protection": False, "memory": 2048, "cpulimit": 0.5,
-         "description": "a&b=c d+e%", "delete": None, "tags": ["a", "b"]},
+        {
+            "onboot": True,
+            "protection": False,
+            "memory": 2048,
+            "cpulimit": 0.5,
+            "description": "a&b=c d+e%",
+            "delete": None,
+            "tags": ["a", "b"],
+        },
     )
     req = env.sent[-1]
     assert req.headers["Content-Type"] == "application/x-www-form-urlencoded"
     pairs = parse_qsl(req.content.decode(), keep_blank_values=True)
     assert pairs == [
-        ("onboot", "1"), ("protection", "0"), ("memory", "2048"), ("cpulimit", "0.5"),
-        ("description", "a&b=c d+e%"), ("tags", "a"), ("tags", "b"),
+        ("onboot", "1"),
+        ("protection", "0"),
+        ("memory", "2048"),
+        ("cpulimit", "0.5"),
+        ("description", "a&b=c d+e%"),
+        ("tags", "a"),
+        ("tags", "b"),
     ]  # None means "not set": dropped, never sent as an empty (clearing) value
 
 
@@ -212,9 +238,15 @@ async def test_cookies_never_persist_across_requests_or_users(env):
 # --- response handling -----------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("encoding", ["gzip", "deflate", "br", "zstd", "gzip, gzip", "x-gzip", "compress"])
+@pytest.mark.parametrize(
+    "encoding", ["gzip", "deflate", "br", "zstd", "gzip, gzip", "x-gzip", "compress"]
+)
 async def test_compressed_responses_refused_without_decoding(env, encoding):
-    bomb = gzip.compress(b"\0" * (8 * 1024 * 1024)) if "gzip" in encoding else zlib.compress(b"\0" * 1024)
+    bomb = (
+        gzip.compress(b"\0" * (8 * 1024 * 1024))
+        if "gzip" in encoding
+        else zlib.compress(b"\0" * 1024)
+    )
     pulled = []
 
     async def body():
@@ -223,7 +255,9 @@ async def test_compressed_responses_refused_without_decoding(env, encoding):
 
     stream = _Stream().init(body)
     env.responses["default"] = lambda r: httpx.Response(
-        200, stream=stream, headers={"Content-Encoding": encoding, "Content-Type": "application/json"}
+        200,
+        stream=stream,
+        headers={"Content-Encoding": encoding, "Content-Type": "application/json"},
     )
     with pytest.raises(ValueError, match="Content-Encoding"):
         await env.c.get("/nodes")
@@ -336,7 +370,7 @@ def _assert_no_secret_reachable(exc, secret=SECRET):
         for attr in ("request", "response"):
             try:
                 obj = getattr(e, attr)
-            except Exception:  # httpx raises RuntimeError when unset
+            except Exception:  # noqa: S112 - httpx raises RuntimeError when unset
                 continue
             if attr == "response":
                 obj = obj.request
@@ -356,7 +390,10 @@ def _assert_no_secret_reachable(exc, secret=SECRET):
 )
 async def test_transport_errors_carry_no_token(env, exc_type):
     def boom(request):
-        raise exc_type(f"failed talking to {request.url} with {request.headers['Authorization']}", request=request)
+        raise exc_type(
+            f"failed talking to {request.url} with {request.headers['Authorization']}",
+            request=request,
+        )
 
     env.responses["default"] = boom
     with pytest.raises(httpx.TransportError) as ei:
@@ -431,7 +468,11 @@ async def test_concurrent_users_get_their_own_tokens(env):
     assert len(env.sent) == 40
     users = [r.headers["Authorization"] for r in env.sent]
     assert all(u.endswith(SECRET) or u.endswith(SECRET_B) for u in users)
-    lines = [json.loads(x) for x in audit_text(env).splitlines() if '"kind": "proxmox"' in x or '"kind":"proxmox"' in x]
+    lines = [
+        json.loads(x)
+        for x in audit_text(env).splitlines()
+        if '"kind": "proxmox"' in x or '"kind":"proxmox"' in x
+    ]
     for line in lines:
         expect = "mcp-alice@pve!mcp" if line["user"] == "alice@example.com" else "mcp-bob@pve!mcp"
         assert line["token_id"] == expect
@@ -439,7 +480,9 @@ async def test_concurrent_users_get_their_own_tokens(env):
 
 async def test_shared_credential_between_two_subjects_is_refused(env):
     # Misconfiguration: bob's enrollment points at alice's token file and user.
-    env.table["bob@example.com"] = FakeEnrollment("bob@example.com", "rw", "mcp-alice@pve", "pve-token-alice")
+    env.table["bob@example.com"] = FakeEnrollment(
+        "bob@example.com", "rw", "mcp-alice@pve", "pve-token-alice"
+    )
     await env.c.get("/nodes")  # alice binds her credential
     current_identity.set(BOB)
     with pytest.raises(PermissionError, match="bound to another"):
@@ -448,7 +491,9 @@ async def test_shared_credential_between_two_subjects_is_refused(env):
 
 
 async def test_token_user_mismatch_for_other_identity(env, creddir):
-    env.table["bob@example.com"] = FakeEnrollment("bob@example.com", "rw", "mcp-bob@pve", "pve-token-alice")
+    env.table["bob@example.com"] = FakeEnrollment(
+        "bob@example.com", "rw", "mcp-bob@pve", "pve-token-alice"
+    )
     current_identity.set(BOB)
     with pytest.raises(PermissionError, match="different Proxmox user"):
         await env.c.get("/nodes")

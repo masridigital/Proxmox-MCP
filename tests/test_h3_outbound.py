@@ -44,7 +44,7 @@ BLOCKED = "blocked by outbound policy"
         # other punctuation never used by the tools
         "/nodes/pve$x",
         "/nodes/pve'x",
-        "/nodes/pve\"x",
+        '/nodes/pve"x',
         "/nodes/pve<x>",
         "/nodes/pve|x",
         "/nodes/pve*",
@@ -78,8 +78,27 @@ def test_deny_rules_see_decoded_path(path, reason):
 
 @pytest.mark.parametrize(
     "method",
-    ["get", "Get", "GET ", " GET", "GET\r\n", "G\x00ET", "HEAD", "OPTIONS", "PATCH", "TRACE",
-     "CONNECT", "PROPFIND", "", None, 1, b"GET", ["GET"], "POſT", "DELETE\t"],
+    [
+        "get",
+        "Get",
+        "GET ",
+        " GET",
+        "GET\r\n",
+        "G\x00ET",
+        "HEAD",
+        "OPTIONS",
+        "PATCH",
+        "TRACE",
+        "CONNECT",
+        "PROPFIND",
+        "",
+        None,
+        1,
+        b"GET",
+        ["GET"],
+        "POſT",
+        "DELETE\t",
+    ],
 )
 def test_method_smuggling(method):
     with pytest.raises(PermissionError, match=BLOCKED):
@@ -103,7 +122,9 @@ def test_allowlist_templates_are_anchored_at_end():
     # A placeholder must never swallow a trailing newline that slipped past validate_path.
     for patterns in outbound._ALLOW.values():
         for p in patterns:
-            assert not p.match(p.pattern.replace("^", "").replace("$", "").replace("\\Z", "") + "\n")
+            assert not p.match(
+                p.pattern.replace("^", "").replace("$", "").replace("\\Z", "") + "\n"
+            )
     for patterns in outbound._ALLOW.values():
         for p in patterns:
             assert p.pattern.endswith("\\Z")
@@ -112,6 +133,10 @@ def test_allowlist_templates_are_anchored_at_end():
 def test_legit_paths_still_pass():
     outbound.check("GET", "/nodes/pve/storage/local/content/local%3Aiso%2Fdebian.iso", "rw")
     outbound.check("GET", "/nodes/pve/storage/local/content/local%3aiso%2fdebian.iso", "rw")
-    outbound.check("GET", "/nodes/pve/tasks/UPID:pve:0000ABCD:0123ABCD:65A1B2C3:qmstart:100:root@pam!t:/log", "ro")
+    outbound.check(
+        "GET",
+        "/nodes/pve/tasks/UPID:pve:0000ABCD:0123ABCD:65A1B2C3:qmstart:100:root@pam!t:/log",
+        "ro",
+    )
     outbound.check("DELETE", "/cluster/firewall/ipset/blk/192.0.2.0%2F24", "rw")
     outbound.check("GET", "/access/users/mcp-alice+x@pve", "ro")
