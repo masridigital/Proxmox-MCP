@@ -12,7 +12,11 @@ or a tunnel hostname behind an Access app whose only policy is the Worker's
 service token) is the only intended client. Nothing here trusts that. Every
 /v1 request passes, in this order:
 
-    1. request size cap   MCP_MAX_REQUEST_BYTES (default 256 KiB)             -> 413
+    1. framing + size     Content-Length digits only, no Transfer-Encoding
+                          but chunked and never with Content-Length, no
+                          Content-Encoding (the body hash is over wire bytes)  -> 400 / 415
+                          MCP_MAX_REQUEST_BYTES (default 256 KiB)             -> 413
+                          raw request target must equal the decoded route     -> 404
     2. Host allowlist     MCP_ALLOWED_HOSTS (DNS rebinding); any Origin       -> 400 / 421 / 403
     (the identity assertion, layer 4, is mandatory in every mode; no setting turns it off)
     3. Access JWT         Cf-Access-Jwt-Assertion, a service token whose
@@ -20,6 +24,8 @@ service token) is the only intended client. Nothing here trusts that. Every
                           required unless BROKER_REQUIRE_ACCESS_JWT=0         -> 401 / 503
     4. identity           X-MCP-Identity, Ed25519 JWS from the Worker, bound to
                           this body, method and path, single use              -> 401
+                          (headers are checked BEFORE the body is read, and the
+                          body must arrive within MCP_BODY_TIMEOUT)           -> 408
     5. enrollment         the asserted user must be enrolled here             -> 403
        request rate       coarse per-user cap on all /v1 traffic              -> 429
     6. endpoint           identity bound for the request (scope + ContextVar)
@@ -86,6 +92,10 @@ CORRELATION_SCOPE_KEY = "proxmox_mcp.correlation"
 DEFAULT_MAX_REQUEST_BYTES = 256 * 1024
 DEFAULT_PORT = 8765
 DEFAULT_BIND = "127.0.0.1"
+# Request head budget. The Access JWT (<= 8 KiB) and the identity assertion
+# (<= 4 KiB) are the large ones; cloudflared adds a couple of dozen small headers.
+MAX_HEADER_BYTES = 32 * 1024
+MAX_HEADER_COUNT = 100
 
 SECURITY_HEADERS: tuple[tuple[bytes, bytes], ...] = (
     (b"cache-control", b"no-store"),
@@ -97,9 +107,12 @@ SECURITY_HEADERS: tuple[tuple[bytes, bytes], ...] = (
     (b"cross-origin-resource-policy", b"same-origin"),
 )
 _SECURITY_HEADER_NAMES = frozenset(name for name, _ in SECURITY_HEADERS) | {b"server"}
-_HOST_ENTRY_RE = re.compile(r"^[a-z0-9.-]+(:[0-9]{1,5})?$|^\[[0-9a-f:.]+\](:[0-9]{1,5})?$")
-_TOOL_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
-_RAY_RE = re.compile(r"^[A-Za-z0-9-]{1,64}$")
+_HOST_ENTRY_RE = re.compile(r"[a-z0-9.-]+(:[0-9]{1,5})?|\[[0-9a-f:.]+\](:[0-9]{1,5})?")
+# All matched with fullmatch: a `$` anchor also matches before a trailing newline.
+_TOOL_RE = re.compile(r"[A-Za-z0-9_-]{1,64}")
+_RAY_RE = re.compile(r"[A-Za-z0-9-]{1,64}")
+# Digits only (str.isdigit() accepts e.g. U+00B2), and short enough for int().
+_CONTENT_LENGTH_RE = re.compile(r"[0-9]{1,12}")
 _LOOPBACK_NAMES = ("127.0.0.1", "localhost", "[::1]")
 _TRUE = {"1", "true", "yes"}
 _FALSE = {"0", "false", "no"}
@@ -144,6 +157,11 @@ class HttpSettings:
     require_access_jwt: bool = True
     max_request_bytes: int = DEFAULT_MAX_REQUEST_BYTES
     request_timeout: float = 120.0
+    # The whole request body must arrive within this many seconds (slow-body
+    # slowloris). cloudflared sends a <= 256 KiB body in one go.
+    body_timeout: float = 15.0
+    # The request line and headers must arrive within this many seconds.
+    header_timeout: float = 10.0
     bind: str = DEFAULT_BIND
     port: int = DEFAULT_PORT
     max_concurrency: int = 64
@@ -152,7 +170,7 @@ class HttpSettings:
         if not self.allowed_hosts:
             raise ConfigError("MCP_ALLOWED_HOSTS is not set")
         for host in self.allowed_hosts:
-            if not _HOST_ENTRY_RE.match(host):
+            if not _HOST_ENTRY_RE.fullmatch(host):
                 raise ConfigError("MCP_ALLOWED_HOSTS contains an invalid entry")
 
     @classmethod
@@ -171,6 +189,8 @@ class HttpSettings:
                 "MCP_MAX_REQUEST_BYTES", DEFAULT_MAX_REQUEST_BYTES, lo=1024, hi=4 * 1024 * 1024
             ),
             request_timeout=float(_env_int("MCP_REQUEST_TIMEOUT", 120, lo=5, hi=900)),
+            body_timeout=float(_env_int("MCP_BODY_TIMEOUT", 15, lo=1, hi=300)),
+            header_timeout=float(_env_int("MCP_HEADER_TIMEOUT", 10, lo=1, hi=120)),
             bind=os.getenv("MCP_BIND", DEFAULT_BIND).strip() or DEFAULT_BIND,
             port=port,
             max_concurrency=_env_int("MCP_MAX_CONCURRENCY", 64, lo=1, hi=4096),
@@ -270,16 +290,27 @@ class RequestSizeCap:
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         try:
             length = _header(scope, b"content-length")
+            transfer = _header(scope, b"transfer-encoding")
+            encoding = _header(scope, b"content-encoding")
         except ValueError:
             await _send_json(send, 400, {"error": "bad request"})
             return
-        if length is not None:
-            if not length.isdigit():
-                await _send_json(send, 400, {"error": "bad request"})
-                return
-            if int(length) > self.max_bytes:
-                await _send_json(send, 413, {"error": "request too large"})
-                return
+        # The server (h11) already enforces most of this; repeat it here so the
+        # guard does not depend on which HTTP parser sits in front of it.
+        if length is not None and not _CONTENT_LENGTH_RE.fullmatch(length):
+            await _send_json(send, 400, {"error": "bad request"})
+            return
+        if transfer is not None and (length is not None or transfer.strip().lower() != "chunked"):
+            await _send_json(send, 400, {"error": "bad request"})
+            return
+        if encoding is not None and encoding.strip().lower() != "identity":
+            # Never inflate: the identity assertion hashes the bytes on the wire,
+            # and a decompressor is an amplification surface.
+            await _send_json(send, 415, {"error": "unsupported media type"})
+            return
+        if length is not None and int(length) > self.max_bytes:
+            await _send_json(send, 413, {"error": "request too large"})
+            return
 
         seen = 0
         started = False
@@ -368,17 +399,18 @@ class BrokerAuth:
         access_verifier: AccessVerifier | None,
         enrollment_check: EnrollmentCheck = _default_enrollment_check,
         request_limiter: RateLimiter | None = None,
+        body_timeout: float = 15.0,
     ) -> None:
         self.endpoint = endpoint
+        self.body_timeout = body_timeout
         self.assertion_verifier = assertion_verifier
         self.access_verifier = access_verifier
         self.enrollment_check = enrollment_check
         self.request_limiter = request_limiter
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        body = await _read_body(receive)
-        if body is None:
-            return
+        # Everything that does not need the body is checked first, so an
+        # unauthenticated client cannot make the broker wait for or buffer one.
         try:
             access_token = _header(scope, JWT_HEADER.encode())
             assertion = _header(scope, ASSERTION_HEADER.encode())
@@ -386,7 +418,7 @@ class BrokerAuth:
         except ValueError:
             await _send_json(send, 401, {"error": "unauthorized"}, _UNAUTHORIZED_HEADERS)
             return
-        ray_id = ray if ray is not None and _RAY_RE.match(ray) else None
+        ray_id = ray if ray is not None and _RAY_RE.fullmatch(ray) else None
         correlation: dict[str, Any] = {}
 
         if self.access_verifier is not None:
@@ -401,6 +433,20 @@ class BrokerAuth:
                 await _send_json(send, 503, {"error": "unavailable"}, [(b"retry-after", b"30")])
                 return
             correlation["svc"] = service.subject
+
+        if not assertion:
+            log.info("identity assertion refused: missing assertion (ray=%s)", ray_id)
+            await _send_json(send, 401, {"error": "unauthorized"}, _UNAUTHORIZED_HEADERS)
+            return
+        try:
+            with anyio.fail_after(self.body_timeout):
+                body = await _read_body(receive)
+        except TimeoutError:
+            log.info("request body not received within %ss (ray=%s)", self.body_timeout, ray_id)
+            await _send_json(send, 408, {"error": "request timeout"}, [(b"connection", b"close")])
+            return
+        if body is None:
+            return
 
         try:
             verified = self.assertion_verifier.verify(
@@ -466,7 +512,7 @@ def parse_execute_body(body: bytes) -> tuple[str, dict[str, Any]] | None:
         return None
     tool = doc.get("tool")
     arguments = doc.get("arguments", {})
-    if not isinstance(tool, str) or not _TOOL_RE.match(tool) or not isinstance(arguments, dict):
+    if not isinstance(tool, str) or not _TOOL_RE.fullmatch(tool) or not isinstance(arguments, dict):
         return None
     return tool, arguments
 
@@ -534,6 +580,17 @@ class GuardApp:
                 await send({"type": "websocket.close", "code": 1008})
             return
 
+        headers = scope.get("headers", ())
+        if (
+            len(headers) > MAX_HEADER_COUNT
+            or sum(len(k) + len(v) for k, v in headers) > MAX_HEADER_BYTES
+        ):
+            # h11's incomplete-event cap only bounds a head that arrives in
+            # pieces; one that arrives in a single read is parsed whole. Enforce
+            # the head budget on what was actually parsed.
+            await _send_json(send, 431, {"error": "request header fields too large"})
+            return
+
         started = False
 
         async def tracking_send(message: Message) -> None:
@@ -552,6 +609,13 @@ class GuardApp:
     async def _dispatch(self, scope: Scope, receive: Receive, send: Send) -> None:
         path = scope.get("path", "")
         method = scope.get("method", "")
+        raw_path = scope.get("raw_path")
+        if raw_path is not None and raw_path != path.encode("utf-8", "surrogateescape"):
+            # The server percent-decodes the target into ``path``. Only the
+            # canonical spelling routes, so the path the Worker signed is exactly
+            # the bytes on the wire (no /v1%2Fexecute, no %65 tricks).
+            await _send_json(send, 404, {"error": "not found"})
+            return
         if path == HEALTH_PATH and method in ("GET", "HEAD") and not scope.get("query_string"):
             await _send_body(send, 200, b"ok", b"text/plain; charset=utf-8")
             return
@@ -617,6 +681,7 @@ def create_app(
                     access_verifier=access_verifier,
                     enrollment_check=enrollment_check or _default_enrollment_check,
                     request_limiter=request_limiter,
+                    body_timeout=settings.body_timeout,
                 ),
                 settings.allowed_hosts,
             ),
@@ -624,6 +689,83 @@ def create_app(
         )
 
     return SecurityHeaders(GuardApp(guarded, Starlette(lifespan=lifespan), settings))
+
+
+def header_timeout_protocol(header_timeout: float) -> type:
+    """uvicorn's h11 protocol plus a deadline for receiving request headers.
+
+    Stock uvicorn arms no timer until the first response is sent: a connection
+    that sends nothing, or a partial request line/header block, is held forever
+    and counts against ``limit_concurrency``, so a few dozen slowloris sockets
+    make every real request 503. Here a timer runs whenever the connection is
+    waiting for the head of a request (h11 ``their_state`` IDLE); when it fires
+    and the head is still incomplete, the transport is closed. Body slowness is
+    bounded separately by ``body_timeout`` in BrokerAuth.
+    """
+    import h11
+    from uvicorn.protocols.http.h11_impl import H11Protocol
+
+    class HeaderTimeoutH11Protocol(H11Protocol):
+        _header_timer: Any = None
+
+        def connection_made(self, transport: Any) -> None:  # type: ignore[override]
+            super().connection_made(transport)
+            self._arm_header_timer()
+
+        def data_received(self, data: bytes) -> None:
+            super().data_received(data)
+            if self.conn.their_state is h11.IDLE:
+                self._arm_header_timer()
+            else:
+                self._disarm_header_timer()
+
+        def connection_lost(self, exc: Exception | None) -> None:
+            self._disarm_header_timer()
+            super().connection_lost(exc)
+
+        def _arm_header_timer(self) -> None:
+            if self._header_timer is None:
+                self._header_timer = self.loop.call_later(header_timeout, self._header_expired)
+
+        def _disarm_header_timer(self) -> None:
+            if self._header_timer is not None:
+                self._header_timer.cancel()
+                self._header_timer = None
+
+        def _header_expired(self) -> None:
+            self._header_timer = None
+            if self.conn.their_state is h11.IDLE and not self.transport.is_closing():
+                log.info("closing connection: request head not received in %ss", header_timeout)
+                self.transport.close()
+
+    return HeaderTimeoutH11Protocol
+
+
+def uvicorn_options(settings: HttpSettings) -> dict[str, Any]:
+    """Keyword arguments for uvicorn.run / uvicorn.Config (one place, tested)."""
+    return {
+        "host": settings.bind,
+        "port": settings.port,
+        # Never trust X-Forwarded-*: identity comes from signed tokens, not addresses.
+        "proxy_headers": False,
+        "forwarded_allow_ips": "",
+        "server_header": False,
+        "date_header": False,
+        "access_log": False,
+        # Pure-Python h11 (strict framing: refuses Content-Length together with
+        # Transfer-Encoding and malformed lengths), never "auto": an installed
+        # httptools would silently replace it and drop the header-size cap below.
+        "http": header_timeout_protocol(settings.header_timeout),
+        "ws": "none",
+        "lifespan": "on",
+        "limit_concurrency": settings.max_concurrency,
+        "backlog": 128,
+        "timeout_keep_alive": 5,
+        "timeout_graceful_shutdown": 10,
+        # Whole request head (request line + headers) at most 32 KiB -> 431/400.
+        "h11_max_incomplete_event_size": 32 * 1024,
+        "log_level": "info",
+    }
 
 
 def main() -> None:
@@ -652,22 +794,4 @@ def main() -> None:
         "required" if settings.require_access_jwt else "OFF",
         len(settings.allowed_hosts),
     )
-    uvicorn.run(
-        application,
-        host=settings.bind,
-        port=settings.port,
-        # Never trust X-Forwarded-*: identity comes from signed tokens, not addresses.
-        proxy_headers=False,
-        forwarded_allow_ips="",
-        server_header=False,
-        date_header=False,
-        access_log=False,
-        ws="none",
-        lifespan="on",
-        limit_concurrency=settings.max_concurrency,
-        backlog=128,
-        timeout_keep_alive=5,
-        timeout_graceful_shutdown=10,
-        h11_max_incomplete_event_size=32 * 1024,
-        log_level="info",
-    )
+    uvicorn.run(application, **uvicorn_options(settings))

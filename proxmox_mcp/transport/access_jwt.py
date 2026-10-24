@@ -44,6 +44,7 @@ import jwt
 from jwt.algorithms import RSAAlgorithm
 
 from ..identity import Identity
+from .jws_strict import MalformedJws, parse_compact
 
 log = logging.getLogger(__name__)
 
@@ -72,6 +73,8 @@ _EMAIL_RE = re.compile(r"^[^\s@\x00-\x1f\x7f]{1,64}@[^\s@\x00-\x1f\x7f]{1,255}$"
 _COMMON_NAME_RE = re.compile(r"^[A-Za-z0-9._@-]{1,255}$")
 _COUNTRY_RE = re.compile(r"^[A-Z]{2}$")
 _TRUE = {"1", "true", "yes"}
+# Cloudflare Access application tokens carry exactly these header parameters.
+_HEADER_PARAMS = frozenset({"alg", "kid", "typ"})
 
 
 class AccessConfigError(RuntimeError):
@@ -107,7 +110,7 @@ def normalize_team_domain(value: str) -> str:
     host = (parts.hostname or "").lower()
     if (
         parts.scheme != "https"
-        or not _HOST_RE.match(host)
+        or not _HOST_RE.fullmatch(host)
         or parts.username is not None
         or parts.password is not None
         or parts.port is not None
@@ -127,7 +130,7 @@ def parse_audiences(value: str | Iterable[str]) -> tuple[str, ...]:
     if not auds:
         raise AccessConfigError("CF_ACCESS_AUD is not set")
     for aud in auds:
-        if not _AUD_RE.match(aud):
+        if not _AUD_RE.fullmatch(aud):
             raise AccessConfigError("CF_ACCESS_AUD contains an invalid value")
     return auds
 
@@ -157,7 +160,7 @@ class AccessVerifier:
         self.service_client_ids: frozenset[str] | None = None
         if service_client_ids is not None:
             ids = frozenset(c.strip() for c in service_client_ids if c and c.strip())
-            if not ids or not all(_COMMON_NAME_RE.match(c) for c in ids):
+            if not ids or not all(_COMMON_NAME_RE.fullmatch(c) for c in ids):
                 raise AccessConfigError("BROKER_ALLOWED_SERVICE_CLIENT_IDS is not set or invalid")
             self.service_client_ids = ids
             self.allow_service_tokens = True
@@ -231,7 +234,7 @@ class AccessVerifier:
             if (
                 jwk.get("kty") != "RSA"
                 or not isinstance(kid, str)
-                or not _KID_RE.match(kid)
+                or not _KID_RE.fullmatch(kid)
                 or jwk.get("alg", "RS256") != "RS256"
                 or jwk.get("use", "sig") != "sig"
             ):
@@ -304,22 +307,17 @@ class AccessVerifier:
 
     async def verify(self, token: str) -> dict[str, Any]:
         """Verified claims of an Access application token, or AccessDenied."""
-        if not isinstance(token, str) or not token or len(token) > MAX_TOKEN_BYTES:
-            raise AccessDenied("missing or oversized token")
-        if token.count(".") != 2:
-            raise AccessDenied("malformed token")
+        # Strict pre-parse: canonical base64url, unique JSON keys, header
+        # allowlist {alg, kid, typ}. The algorithm comes from configuration, never
+        # from the token: anything but RS256 is refused before a key is looked up.
         try:
-            header = jwt.get_unverified_header(token)
-        except jwt.PyJWTError:
-            raise AccessDenied("malformed token header") from None
-        # Decide the algorithm from configuration, never from the token: anything
-        # but RS256 is refused before a key is looked up.
-        if header.get("alg") != "RS256":
-            raise AccessDenied("algorithm not allowed")
-        if "crit" in header or "jku" in header or "x5u" in header or "jwk" in header:
-            raise AccessDenied("unsupported token header")
+            header, _ = parse_compact(
+                token, max_bytes=MAX_TOKEN_BYTES, alg="RS256", allowed_header=_HEADER_PARAMS
+            )
+        except MalformedJws as exc:
+            raise AccessDenied(f"malformed token: {exc}") from None
         kid = header.get("kid")
-        if not isinstance(kid, str) or not _KID_RE.match(kid):
+        if not isinstance(kid, str) or not _KID_RE.fullmatch(kid):
             raise AccessDenied("missing kid")
 
         key = await self._key_for(kid)
@@ -344,7 +342,7 @@ class AccessVerifier:
             raise AccessDenied(f"invalid token: {type(exc).__name__}") from None
 
         iss = claims.get("iss")
-        if not isinstance(iss, str) or iss.rstrip("/") != self.issuer:
+        if not isinstance(iss, str) or iss != self.issuer:
             raise AccessDenied("issuer mismatch")
         token_type = claims.get("type")
         if token_type is not None and token_type != "app":
@@ -359,7 +357,7 @@ class AccessVerifier:
         email_header: str | None = None,
     ) -> Identity:
         country = claims.get("country")
-        country = country if isinstance(country, str) and _COUNTRY_RE.match(country) else None
+        country = country if isinstance(country, str) and _COUNTRY_RE.fullmatch(country) else None
 
         email = claims.get("email")
         if self.service_client_ids is not None:
@@ -373,7 +371,9 @@ class AccessVerifier:
             return Identity(subject=common_name, kind="service", country=country, ray_id=ray_id)
 
         if isinstance(email, str) and email:
-            if not _EMAIL_RE.match(email):
+            # ASCII only: str.lower() maps e.g. KELVIN SIGN to "k", so a non-ASCII
+            # address could lowercase onto an enrolled one.
+            if not email.isascii() or not _EMAIL_RE.fullmatch(email):
                 raise AccessDenied("malformed email claim")
             email = email.lower()
             if email_header is not None and email_header.strip().lower() != email:
@@ -384,7 +384,7 @@ class AccessVerifier:
         if isinstance(common_name, str) and common_name:
             if not self.allow_service_tokens:
                 raise AccessDenied("service tokens are not allowed")
-            if not _COMMON_NAME_RE.match(common_name):
+            if not _COMMON_NAME_RE.fullmatch(common_name):
                 raise AccessDenied("malformed common_name claim")
             if email_header is not None:
                 raise AccessDenied("email header on a service token")
