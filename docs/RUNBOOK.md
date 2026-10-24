@@ -17,6 +17,15 @@ only), `<proxmox-host>` (for example pve.example.internal), `<pool>`, `<short>` 
 
 Do the steps in this order. Get a change approval first (SOC 2 CC8.1). Record the ticket number.
 
+The planner prints these steps with your values filled in, and marks who runs each one:
+
+```
+cp deploy/provision.example.toml deploy/provision.toml   # fill it; git-ignored; no secrets
+python3 deploy/plan.py deploy/provision.toml
+```
+
+An AI agent follows [AGENTS.md](../AGENTS.md).
+
 ### 1.1 Build the release (build workstation)
 
 1. Check out the approved commit. Run CI (lint, tests, pip-audit, npm audit, secret scan).

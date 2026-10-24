@@ -11,6 +11,7 @@ hash-chained audit log.
 
 ## Contents
 
+- [Setup](#setup)
 - [Architecture](#architecture)
 - [Security model](#security-model)
 - [Modes and tool tiers](#modes-and-tool-tiers)
@@ -21,6 +22,57 @@ hash-chained audit log.
 - [Documents](#documents)
 - [Changes from upstream](#changes-from-upstream)
 - [Credits and license](#credits-and-license)
+
+## Setup
+
+The deployment works with any Proxmox VE 8 or 9 cluster, any Cloudflare account with Zero
+Trust, and a Windows Server 2025 host for the broker. One file holds every value of your
+deployment, and one command turns it into the exact ordered steps.
+
+**AI agents:** read [AGENTS.md](AGENTS.md) first. It holds the rules and the workflow.
+
+### Prerequisites
+
+| Where | What you need |
+|---|---|
+| Proxmox VE | Root shell on one node (SSH). A resource pool for the guests the AI may see. |
+| Broker host | Windows Server 2025, BitLocker with TPM, outbound HTTPS and UDP/TCP 7844, a route to the Proxmox API port. No inbound port. |
+| Cloudflare | Zero Trust with an identity provider that enforces MFA, an MCP Server Portal, a zone for two host names, Workers (Standard plan), R2. An API token with the permissions in the header of `deploy/cloudflare/provision.sh`. |
+| Azure (or equal) | A storage container with a locked time-based retention policy for the audit log. |
+| Workstation | Python 3.11 or later, `uv`, Node 22, `jq`, `curl`, `openssl`, `ssh`. |
+| Legal | If any guest in scope can hold PHI: signed BAAs with Cloudflare and Anthropic. |
+
+### Steps
+
+1. Copy the template and fill it. The copy is git-ignored. Put no secret in it.
+   ```sh
+   cp deploy/provision.example.toml deploy/provision.toml
+   ```
+2. Validate it and print the plan:
+   ```sh
+   python3 deploy/plan.py deploy/provision.toml            # numbered steps with exact commands
+   python3 deploy/plan.py deploy/provision.toml --json     # the same plan for an AI agent
+   ```
+3. Run the steps in order. Each step names where it runs, who runs it, and the check
+   that must pass before the next step:
+
+   | Phase | Where | What |
+   |---|---|---|
+   | 0 preflight | you | Change approval, MFA policy, BAAs if PHI is in scope |
+   | 1 build | workstation | Build the wheel, check the hashed lock, hash the downloads |
+   | 2 proxmox | Proxmox node | Roles and pool, one user per person, read the TLS pin |
+   | 3 broker | broker | Host baseline, broker install, cloudflared, firewall |
+   | 4 credentials | node to broker | One API token per person, piped into DPAPI; enrollment |
+   | 5 cloudflare | workstation | Tunnel, Access apps, Worker, R2 lock, portal entry |
+   | 6 activate | broker | Second install pass with the Access values, key escrow, audit shipping |
+   | 7 verify | broker and Claude | `Test-ProxmoxMcpBroker.ps1 -Live`, 401 check, first read from Claude |
+
+4. Secrets never pass through a file, a chat or a command line. Proxmox tokens go from the
+   node straight into the broker's DPAPI store. The Cloudflare API token is typed at a
+   hidden prompt. The plan marks every such step `HUMAN, SECRET`.
+
+[docs/RUNBOOK.md](docs/RUNBOOK.md) explains each step in detail, and covers day-2 tasks:
+enroll a person, rotate a token, revoke access, emergency off.
 
 ## Architecture
 
@@ -105,16 +157,16 @@ Each tool has one tier. Each enrolled person has one mode.
 
 | Tier | Tools | What it covers |
 |---|---|---|
-| read | 140 | GET only: inventory, status, configuration, logs, tasks. |
+| read | 133 | GET only: inventory, status, configuration, task logs. |
 | operate | 16 | Reversible guest lifecycle: start, stop, shutdown, reboot, reset, suspend, resume, snapshot create. |
-| admin | 80 | Guest create, clone, delete, configuration, disks, migration, guest firewall, pools, HA, backup jobs, SDN. |
-| forbidden | 104 | Never available: users, tokens, ACLs, TFA, passwords, consoles, guest agent exec and files, cloud-init user data, host power and network, host disks, cluster firewall, certificates, storage definitions, notification endpoints. |
+| admin | 85 | Guest create, clone, delete, configuration, disks, migration, guest firewall, pools, HA, backup jobs, SDN, raw host logs. |
+| forbidden | 106 | Never available: users, tokens, ACLs, TFA, passwords, consoles, guest agent exec and files, cloud-init user data, host power and network, host disks, cluster firewall, certificates, storage definitions, notification endpoints. |
 
 | Mode | Tiers | Tools |
 |---|---|---|
-| ro | read | 140 |
-| operator | read, operate | 156 |
-| rw | read, operate, admin | 236 when `MCP_ALLOW_ADMIN_TOOLS=1`, else 156 |
+| ro | read | 133 |
+| operator | read, operate | 149 |
+| rw | read, operate, admin | 234 when `MCP_ALLOW_ADMIN_TOOLS=1`, else 149 |
 
 The default for every new person is `ro`. Admin tools stay off until the operator
 sets `MCP_ALLOW_ADMIN_TOOLS=1` on the broker. `MCP_TOOL_DENY` and `MCP_TOOL_ALLOW`
@@ -208,6 +260,8 @@ certificate. With a wrong pin, no request byte reaches the server.
 
 | Document | Content |
 |---|---|
+| [AGENTS.md](AGENTS.md) | Rules and provisioning workflow for AI agents. |
+| [deploy/provision.example.toml](deploy/provision.example.toml) | Template of every deployment value. |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Components, data path, trust boundaries. |
 | [docs/SECURITY.md](docs/SECURITY.md) | Threat model and risk register. |
 | [docs/COMPLIANCE.md](docs/COMPLIANCE.md) | HIPAA and SOC 2 control map with evidence. |

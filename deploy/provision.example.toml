@@ -1,0 +1,107 @@
+# Proxmox MCP deployment file (example).
+#
+# 1. Copy it:   cp deploy/provision.example.toml deploy/provision.toml
+#    deploy/provision.toml is git-ignored. Never commit it: it holds your account ids and hosts.
+# 2. Fill every value. Keep secrets OUT of this file: no API tokens, passwords, keys or SAS
+#    strings. Secrets are typed at hidden prompts or piped from host to host (AGENTS.md rule 2).
+# 3. Validate and print the ordered plan:
+#      python3 deploy/plan.py deploy/provision.toml            # human-readable steps
+#      python3 deploy/plan.py deploy/provision.toml --json     # for an AI agent
+#      python3 deploy/plan.py deploy/provision.toml --env      # exports for provision.sh
+#
+# All values below are examples (example.com, 192.0.2.0/24, zero ids). They are not real.
+
+[deployment]
+# Free text, used in comments and change tickets only.
+name = "example-proxmox-mcp"
+# "access": the Worker reaches the broker through a hostname that only its Access service
+#           token can pass (generally available).
+# "vpc":    Workers VPC binding, no broker hostname (Cloudflare beta at the time of writing).
+broker_mode = "access"
+# true if any guest in scope can hold PHI. Then the plan stops until both BAAs are recorded.
+phi_in_scope = false
+# Set to the dates the BAAs were signed when phi_in_scope = true ("YYYY-MM-DD"), else "".
+baa_cloudflare_signed = ""
+baa_anthropic_signed = ""
+
+[proxmox]
+# Host name or IP literal of one Proxmox VE node (the API is cluster-wide).
+host = "pve.example.internal"
+port = 8006
+# SHA-256 of the node's API certificate, colon-separated. Step "proxmox-pin" prints it.
+# Leave "" until then; the plan shows the step that fills it.
+tls_fingerprint = ""
+# Resource pool the AI may see. Put only the guests in scope into it.
+pool = "mcp"
+# SSH target for the node, used by the operator's shell (root, or a sudo-capable user).
+ssh = "root@pve.example.internal"
+# Grant Sys.Audit on /nodes (node status, task lists). Recommended.
+node_audit = true
+# Grant Sys.Syslog on /nodes (raw host logs). Off: host logs can name guests and people.
+node_syslog = false
+# Proxmox API token lifetime in days (max 365). Rotate before it ends.
+token_ttl_days = 90
+
+[broker]
+# Windows Server 2025 host that runs the broker and cloudflared.
+hostname = "broker01.example.internal"
+# Optional OpenSSH target ("user@host") for piping secrets from the Mac or the Proxmox node
+# straight into the broker's DPAPI store. "" = paste at the broker's hidden prompt instead.
+ssh = ""
+# Loopback port of the broker HTTP API.
+port = 8765
+# IPv4 CIDRs of the Proxmox node(s) the broker may reach on the API port (firewall rule).
+proxmox_addresses = ["192.0.2.10/32"]
+# Folder on the broker that holds the deploy scripts and build artifacts.
+staging_dir = 'C:\Install\proxmox-mcp'
+# Admin tools (create/delete/config) for rw users. Keep false until you need them.
+allow_admin_tools = false
+
+[artifacts]
+# Python for Windows: the newest python.org installer of the line named in the first lines of
+# requirements/broker-win.txt ("CPython X.Y"). Record its SHA-256 from a second network.
+python_installer = "python-3.14.0-amd64.exe"
+python_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+cloudflared_msi = "cloudflared-windows-amd64.msi"
+cloudflared_version = "2026.10.3"
+cloudflared_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+winsw_exe = "WinSW.NET461.exe"
+winsw_sha256 = "b5066b7bbdfba1293e5d15cda3caaea88fbeab35bd5b38c41c913d492aadfc4f"
+
+[cloudflare]
+account_id = "00000000000000000000000000000000"
+zone_id = "00000000000000000000000000000000"
+# Zero Trust team domain.
+team_domain = "https://example-team.cloudflareaccess.com"
+# Identity provider id in Zero Trust (Entra ID or another IdP that enforces MFA).
+idp_id = "00000000-0000-0000-0000-000000000000"
+# Public hostname of the Worker (in the zone above). Claude connects here.
+worker_hostname = "proxmox-mcp.example.com"
+# access mode only: hostname of the broker (in the zone above). Only the Worker can pass it.
+broker_hostname = "proxmox-broker.example.com"
+# Existing MCP Server Portal id, and the id this server gets inside it.
+portal_id = "example-portal"
+server_id = "proxmox-mcp"
+# New R2 bucket for the Worker audit chain (a 2190-day bucket lock is applied).
+audit_bucket = "proxmox-mcp-audit"
+# Require the IdP to report MFA in the token (amr). Set false only if Conditional Access
+# enforces MFA and the IdP does not send amr; record that decision.
+require_mfa = true
+
+[audit_shipping]
+# Immutable Azure Blob container for the broker audit log (2190-day retention, locked).
+storage_account = "examplestorage"
+container = "proxmox-mcp-audit"
+
+[escrow]
+# Two custodians of the audit HMAC key. Neither may be a broker administrator.
+custodian_a = "Custodian A"
+custodian_b = "Custodian B"
+
+# One block per person. One person = one Proxmox user = one API token.
+# short: lowercase name for the Proxmox user mcp-<short>@pve.
+# mode:  "ro" (read), "operator" (read + guest power and snapshots), "rw" (+ admin tier).
+[[users]]
+email = "alice@example.com"
+short = "alice"
+mode = "ro"
