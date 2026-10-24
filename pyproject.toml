@@ -56,6 +56,7 @@ proxmox-mcp-server = "proxmox_mcp.server:run"
 proxmox-mcp-http = "proxmox_mcp.transport.http_app:main"
 proxmox-mcp-audit-verify = "proxmox_mcp.audit:main"
 proxmox-mcp-protect-credential = "proxmox_mcp.credentials:protect_main"
+proxmox-mcp-selfcheck = "proxmox_mcp.selfcheck:main"
 
 [build-system]
 requires = ["hatchling"]
