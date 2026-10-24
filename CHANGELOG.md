@@ -6,6 +6,44 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+Fork of ry-ops/proxmox-mcp-server at upstream commit `7276144`. The entries for
+2.4.0 and earlier are the upstream history.
+
+### Added
+- On-premises broker HTTP API (`proxmox-mcp-http`): `GET /healthz`, `GET /v1/catalog`,
+  `POST /v1/execute`. It binds 127.0.0.1 and is called only by the Cloudflare Worker.
+- Broker authentication: Cloudflare Access service-token JWT, and an Ed25519 identity
+  assertion from the Worker that is bound to the request body, method and path, lives
+  60 s and is single use.
+- Enrollment file: each email has one mode (`ro`, `operator`, `rw`) and its own
+  privilege-separated Proxmox API token, read from the credentials directory.
+- Tool tiers (`read`, `operate`, `admin`, `forbidden`) for all 340 tools. Admin tools
+  need `rw` and `MCP_ALLOW_ADMIN_TOOLS=1`. 104 tools are human-only.
+- Strict argument validation, outbound method and path allowlist per mode, PHI check
+  on writes, output redaction, untrusted-data label, 2 MiB result cap.
+- Hash-chained JSONL audit log and `proxmox-mcp-audit-verify`.
+- Windows credentials with DPAPI (`proxmox-mcp-protect-credential`).
+- Cloudflare Worker gateway in `worker/` (MCP-STD-02 three-tool routing).
+- End-to-end tests that run every tool as each mode through the real broker and
+  compare the Proxmox calls with the upstream handlers.
+
+### Changed
+- Proxmox TLS is always verified: a CA bundle or a SHA-256 certificate pin.
+  `PROXMOX_INSECURE_TLS=1` is for a disposable lab only and logs a warning.
+- README, USAGE, SETUP, QUICKSTART, `.env.example`, `agent-card.json`, `Dockerfile` and
+  `docker-compose.yaml` describe the broker. The image no longer reads `.env` secrets.
+
+### Removed
+- Password and ticket authentication, `PROXMOX_PASSWORD` (ignored with a warning).
+- `PROXMOX_VERIFY_SSL`. Upstream turned certificate verification off by default.
+- The shared `PROXMOX_TOKEN_*` token for remote use. It remains for the local stdio
+  development identity only.
+- The interactive `setup.sh` and the secret-using `test-connection.sh`. The new
+  `test-connection.sh` checks the certificate pin and the broker without secrets.
+
+### Fixed
+- `analyze_schedule` sends GET, as the Proxmox API defines it (upstream sent POST).
+
 ## [2.4.0] - 2026-10-08
 
 ### Added

@@ -1,11 +1,12 @@
 {
-  "name": "proxmox-mcp-server",
-  "description": "AI agent for managing Proxmox Virtual Environment infrastructure. Provides 340 tools covering nearly the full Proxmox VE API: VMs, containers, storage and backup, clustering and HA, access control, firewall, disks, Ceph, ACME certificates, SDN, notifications, resource pools and appliance deployment.",
+  "name": "proxmox-mcp-broker",
+  "description": "Proxmox VE operations for Claude through MCP, behind Cloudflare Access. Fork of ry-ops/proxmox-mcp-server. Claude sees three meta-tools (list_tools, describe_tool_input, execute_tool). Each person sees only the tools that the mode in the broker enrollment allows: 236 of 340 upstream tools can be enabled; the others are human-only and never exposed.",
   "version": "2.4.0",
-  "url": "https://github.com/ry-ops/proxmox-mcp-server",
+  "url": "https://<worker-hostname>/mcp",
   "protocol": {
     "type": "MCP",
-    "version": "1.0"
+    "transport": "streamable-http",
+    "tool_mode": "dynamic"
   },
   "capabilities": {
     "streaming": false,
@@ -18,31 +19,52 @@
     "required": true,
     "methods": [
       {
-        "type": "api_token",
-        "description": "Proxmox API token authentication (recommended)",
-        "parameters": {
-          "PROXMOX_HOST": "Proxmox server hostname or IP address",
-          "PROXMOX_USER": "Username (e.g., root@pam)",
-          "PROXMOX_TOKEN_NAME": "API token name",
-          "PROXMOX_TOKEN_VALUE": "API token secret value"
-        }
-      },
-      {
-        "type": "password",
-        "description": "Password-based authentication",
-        "parameters": {
-          "PROXMOX_HOST": "Proxmox server hostname or IP address",
-          "PROXMOX_USER": "Username (e.g., root@pam)",
-          "PROXMOX_PASSWORD": "User password"
-        }
+        "type": "oauth2",
+        "description": "Cloudflare Access Managed OAuth through the Cloudflare MCP Server Portal. Entra ID login with MFA. Named users only."
       }
     ],
-    "optional_parameters": {
-      "PROXMOX_PORT": "API port (default: 8006)",
-      "PROXMOX_VERIFY_SSL": "Verify SSL certificates (default: false)",
-      "PROXMOX_READ_ONLY": "Refuse all write operations; only GET requests are sent (default: false)"
-    }
+    "notes": "No Proxmox credential is given to the client. The on-premises broker holds one privilege-separated Proxmox API token per enrolled person."
   },
+  "authorization": {
+    "modes": {
+      "ro": [
+        "read"
+      ],
+      "operator": [
+        "read",
+        "operate"
+      ],
+      "rw": [
+        "read",
+        "operate",
+        "admin (only when MCP_ALLOW_ADMIN_TOOLS=1)"
+      ]
+    },
+    "default_mode": "ro"
+  },
+  "meta_tools": [
+    {
+      "name": "list_tools",
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true
+      }
+    },
+    {
+      "name": "describe_tool_input",
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true
+      }
+    },
+    {
+      "name": "execute_tool",
+      "annotations": {
+        "destructiveHint": true,
+        "openWorldHint": true
+      }
+    }
+  ],
   "skills": [
     {
       "category": "node_management",
@@ -51,35 +73,40 @@
         {
           "name": "list_nodes",
           "description": "List all nodes in the Proxmox cluster with status and resource usage.",
-          "inputs": []
+          "inputs": [],
+          "tier": "read"
         },
         {
           "name": "get_node_status",
           "description": "Get detailed status and resource usage for a specific node.",
           "inputs": [
             "node"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_node_config",
           "description": "Get node configuration (wake-on-LAN MAC, etc.).",
           "inputs": [
             "node"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_node_version",
           "description": "Get Proxmox VE version information for a node.",
           "inputs": [
             "node"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_node_time",
           "description": "Get current time and timezone for a node.",
           "inputs": [
             "node"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "set_node_time",
@@ -87,41 +114,24 @@
           "inputs": [
             "node",
             "timezone"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "get_node_dns",
           "description": "Get DNS configuration for a node.",
           "inputs": [
             "node"
-          ]
-        },
-        {
-          "name": "set_node_dns",
-          "description": "Set DNS configuration for a node.",
-          "inputs": [
-            "node",
-            "search (optional)",
-            "dns1 (optional)",
-            "dns2 (optional)",
-            "dns3 (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_node_hosts",
           "description": "Get /etc/hosts content for a node.",
           "inputs": [
             "node"
-          ]
-        },
-        {
-          "name": "set_node_hosts",
-          "description": "Write /etc/hosts content for a node.",
-          "inputs": [
-            "node",
-            "data",
-            "digest (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_node_network",
@@ -129,7 +139,8 @@
           "inputs": [
             "node",
             "type (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_node_network_interface",
@@ -137,35 +148,32 @@
           "inputs": [
             "node",
             "iface"
-          ]
-        },
-        {
-          "name": "apply_node_network",
-          "description": "Apply pending network configuration changes on a node (reload interfaces).",
-          "inputs": [
-            "node"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "revert_node_network",
           "description": "Revert pending network configuration changes on a node.",
           "inputs": [
             "node"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "get_node_netstat",
           "description": "Get network statistics for a node.",
           "inputs": [
             "node"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "list_node_services",
           "description": "List all systemd services on a node with their state.",
           "inputs": [
             "node"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_node_service_state",
@@ -173,7 +181,8 @@
           "inputs": [
             "node",
             "service"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "start_node_service",
@@ -181,15 +190,8 @@
           "inputs": [
             "node",
             "service"
-          ]
-        },
-        {
-          "name": "stop_node_service",
-          "description": "Stop a systemd service on a node.",
-          "inputs": [
-            "node",
-            "service"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "restart_node_service",
@@ -197,7 +199,8 @@
           "inputs": [
             "node",
             "service"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "reload_node_service",
@@ -205,7 +208,8 @@
           "inputs": [
             "node",
             "service"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "get_node_syslog",
@@ -217,7 +221,8 @@
             "since (optional)",
             "until (optional)",
             "service (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_node_journal",
@@ -230,28 +235,32 @@
             "since (optional)",
             "until (optional)",
             "lastentries (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_node_report",
           "description": "Get a full diagnostic report for a node (OS, hardware, config).",
           "inputs": [
             "node"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_node_subscription",
           "description": "Get Proxmox subscription info for a node.",
           "inputs": [
             "node"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_node_apt_update",
           "description": "List available APT package updates on a node.",
           "inputs": [
             "node"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_node_apt_changelog",
@@ -260,14 +269,16 @@
             "node",
             "name",
             "version (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_node_hardware",
           "description": "List PCI devices and hardware info for a node.",
           "inputs": [
             "node"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_node_rrd",
@@ -277,7 +288,8 @@
             "ds",
             "timeframe",
             "cf (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_node_rrddata",
@@ -286,15 +298,8 @@
             "node",
             "timeframe",
             "cf (optional)"
-          ]
-        },
-        {
-          "name": "node_shutdown",
-          "description": "Shutdown or reboot a Proxmox node.",
-          "inputs": [
-            "node",
-            "command"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "node_startall",
@@ -303,16 +308,8 @@
             "node",
             "vms (optional)",
             "force (optional)"
-          ]
-        },
-        {
-          "name": "node_stopall",
-          "description": "Stop all VMs and containers on a node.",
-          "inputs": [
-            "node",
-            "vms (optional)",
-            "force_stop (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "node_migrateall",
@@ -323,21 +320,24 @@
             "maxworkers (optional)",
             "vms (optional)",
             "with_local_disks (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "get_node_aplinfo",
           "description": "Get available LXC appliance/template info for a node.",
           "inputs": [
             "node"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_node_capabilities_qemu",
           "description": "Get QEMU capabilities for a node (CPU types, machine types, migration options).",
           "inputs": [
             "node"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_node_scan",
@@ -345,14 +345,16 @@
           "inputs": [
             "node",
             "type"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "wakeonlan",
           "description": "Wake a node via Wake-on-LAN.",
           "inputs": [
             "node"
-          ]
+          ],
+          "tier": "admin"
         }
       ]
     },
@@ -365,7 +367,8 @@
           "description": "List all QEMU VMs on a node or cluster-wide.",
           "inputs": [
             "node (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_vm_status",
@@ -373,7 +376,8 @@
           "inputs": [
             "node",
             "vmid"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_vm_config",
@@ -383,7 +387,8 @@
             "vmid",
             "current (optional)",
             "snapshot (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "set_vm_config",
@@ -409,7 +414,8 @@
             "tags (optional)",
             "delete (optional)",
             "digest (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "get_vm_pending",
@@ -417,7 +423,8 @@
           "inputs": [
             "node",
             "vmid"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "start_vm",
@@ -427,7 +434,8 @@
             "vmid",
             "skiplock (optional)",
             "timeout (optional)"
-          ]
+          ],
+          "tier": "operate"
         },
         {
           "name": "stop_vm",
@@ -438,7 +446,8 @@
             "timeout (optional)",
             "skiplock (optional)",
             "keepActive (optional)"
-          ]
+          ],
+          "tier": "operate"
         },
         {
           "name": "shutdown_vm",
@@ -449,7 +458,8 @@
             "timeout (optional)",
             "forceStop (optional)",
             "skiplock (optional)"
-          ]
+          ],
+          "tier": "operate"
         },
         {
           "name": "reboot_vm",
@@ -458,7 +468,8 @@
             "node",
             "vmid",
             "timeout (optional)"
-          ]
+          ],
+          "tier": "operate"
         },
         {
           "name": "reset_vm",
@@ -467,7 +478,8 @@
             "node",
             "vmid",
             "skiplock (optional)"
-          ]
+          ],
+          "tier": "operate"
         },
         {
           "name": "suspend_vm",
@@ -478,7 +490,8 @@
             "skiplock (optional)",
             "todisk (optional)",
             "statestorage (optional)"
-          ]
+          ],
+          "tier": "operate"
         },
         {
           "name": "resume_vm",
@@ -488,7 +501,8 @@
             "vmid",
             "skiplock (optional)",
             "nocheck (optional)"
-          ]
+          ],
+          "tier": "operate"
         },
         {
           "name": "create_vm",
@@ -521,7 +535,8 @@
             "start (optional)",
             "template (optional)",
             "extra_config (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "clone_vm",
@@ -538,7 +553,8 @@
             "target (optional)",
             "snapname (optional)",
             "format (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "delete_vm",
@@ -549,7 +565,8 @@
             "destroy-unreferenced-disks (optional)",
             "purge (optional)",
             "skiplock (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "convert_vm_to_template",
@@ -558,7 +575,8 @@
             "node",
             "vmid",
             "disk (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "list_vm_snapshots",
@@ -566,7 +584,8 @@
           "inputs": [
             "node",
             "vmid"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "create_vm_snapshot",
@@ -577,7 +596,8 @@
             "snapname",
             "description (optional)",
             "vmstate (optional)"
-          ]
+          ],
+          "tier": "operate"
         },
         {
           "name": "get_vm_snapshot_config",
@@ -586,7 +606,8 @@
             "node",
             "vmid",
             "snapname"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "rollback_vm_snapshot",
@@ -596,7 +617,8 @@
             "vmid",
             "snapname",
             "start (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "delete_vm_snapshot",
@@ -606,7 +628,8 @@
             "vmid",
             "snapname",
             "force (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "migrate_vm",
@@ -622,7 +645,8 @@
             "force (optional)",
             "migration_type (optional)",
             "migration_network (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "get_vm_migrate_preconditions",
@@ -631,7 +655,8 @@
             "node",
             "vmid",
             "target"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "resize_vm_disk",
@@ -643,7 +668,8 @@
             "size",
             "skiplock (optional)",
             "digest (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "move_vm_disk",
@@ -659,7 +685,8 @@
             "bwlimit (optional)",
             "target-vmid (optional)",
             "target-disk (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "unlink_vm_disk",
@@ -669,7 +696,8 @@
             "vmid",
             "idlist",
             "force (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "import_vm_disk",
@@ -682,7 +710,8 @@
             "disk (optional)",
             "format (optional)",
             "options (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "get_vm_firewall_rules",
@@ -690,7 +719,8 @@
           "inputs": [
             "node",
             "vmid"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "add_vm_firewall_rule",
@@ -708,7 +738,8 @@
             "comment (optional)",
             "enable (optional)",
             "pos (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "delete_vm_firewall_rule",
@@ -718,7 +749,8 @@
             "vmid",
             "pos",
             "digest (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "get_vm_firewall_options",
@@ -726,7 +758,8 @@
           "inputs": [
             "node",
             "vmid"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "set_vm_firewall_options",
@@ -742,7 +775,8 @@
             "ipfilter (optional)",
             "log_level_in (optional)",
             "log_level_out (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "get_vm_firewall_log",
@@ -752,7 +786,8 @@
             "vmid",
             "limit (optional)",
             "start (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_vm_rrddata",
@@ -762,27 +797,8 @@
             "vmid",
             "timeframe",
             "cf (optional)"
-          ]
-        },
-        {
-          "name": "vm_agent_exec",
-          "description": "Execute a program inside a VM via QEMU guest agent. Returns a PID; use vm_agent_exec_status to retrieve completion status and captured output.",
-          "inputs": [
-            "node",
-            "vmid",
-            "command",
-            "args (optional)",
-            "input-data (optional)"
-          ]
-        },
-        {
-          "name": "vm_agent_exec_status",
-          "description": "Get the completion status and captured stdout/stderr of a QEMU guest agent process started with vm_agent_exec.",
-          "inputs": [
-            "node",
-            "vmid",
-            "pid"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "vm_agent_get_fsinfo",
@@ -790,7 +806,8 @@
           "inputs": [
             "node",
             "vmid"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "vm_agent_get_network_interfaces",
@@ -798,7 +815,8 @@
           "inputs": [
             "node",
             "vmid"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "vm_agent_get_osinfo",
@@ -806,7 +824,8 @@
           "inputs": [
             "node",
             "vmid"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "vm_agent_ping",
@@ -814,18 +833,8 @@
           "inputs": [
             "node",
             "vmid"
-          ]
-        },
-        {
-          "name": "vm_agent_set_user_password",
-          "description": "Set a user password inside a VM via QEMU guest agent.",
-          "inputs": [
-            "node",
-            "vmid",
-            "username",
-            "password",
-            "crypted (optional)"
-          ]
+          ],
+          "tier": "operate"
         },
         {
           "name": "get_vm_feature",
@@ -835,43 +844,8 @@
             "vmid",
             "feature",
             "snapname (optional)"
-          ]
-        },
-        {
-          "name": "get_vm_vnc_proxy",
-          "description": "Get a VNC proxy ticket for a VM console.",
-          "inputs": [
-            "node",
-            "vmid",
-            "websocket (optional)",
-            "generate-password (optional)"
-          ]
-        },
-        {
-          "name": "get_vm_spice_proxy",
-          "description": "Get a SPICE proxy config for a VM console.",
-          "inputs": [
-            "node",
-            "vmid",
-            "proxy (optional)"
-          ]
-        },
-        {
-          "name": "get_vm_cloudinit",
-          "description": "Get cloud-init config dump for a VM.",
-          "inputs": [
-            "node",
-            "vmid",
-            "type"
-          ]
-        },
-        {
-          "name": "regenerate_vm_cloudinit",
-          "description": "Regenerate cloud-init config ISO for a VM.",
-          "inputs": [
-            "node",
-            "vmid"
-          ]
+          ],
+          "tier": "read"
         }
       ]
     },
@@ -884,7 +858,8 @@
           "description": "List all LXC containers on a node.",
           "inputs": [
             "node"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_container_status",
@@ -892,7 +867,8 @@
           "inputs": [
             "node",
             "vmid"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_container_config",
@@ -902,7 +878,8 @@
             "vmid",
             "current (optional)",
             "snapshot (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "set_container_config",
@@ -927,7 +904,8 @@
             "delete (optional)",
             "digest (optional)",
             "unprivileged (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "get_container_pending",
@@ -935,7 +913,8 @@
           "inputs": [
             "node",
             "vmid"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "start_container",
@@ -945,7 +924,8 @@
             "vmid",
             "skiplock (optional)",
             "debug (optional)"
-          ]
+          ],
+          "tier": "operate"
         },
         {
           "name": "stop_container",
@@ -955,7 +935,8 @@
             "vmid",
             "skiplock (optional)",
             "overrule-shutdown (optional)"
-          ]
+          ],
+          "tier": "operate"
         },
         {
           "name": "shutdown_container",
@@ -966,7 +947,8 @@
             "timeout (optional)",
             "forceStop (optional)",
             "skiplock (optional)"
-          ]
+          ],
+          "tier": "operate"
         },
         {
           "name": "reboot_container",
@@ -975,7 +957,8 @@
             "node",
             "vmid",
             "timeout (optional)"
-          ]
+          ],
+          "tier": "operate"
         },
         {
           "name": "suspend_container",
@@ -983,7 +966,8 @@
           "inputs": [
             "node",
             "vmid"
-          ]
+          ],
+          "tier": "operate"
         },
         {
           "name": "resume_container",
@@ -991,7 +975,8 @@
           "inputs": [
             "node",
             "vmid"
-          ]
+          ],
+          "tier": "operate"
         },
         {
           "name": "create_container",
@@ -1016,7 +1001,8 @@
             "storage (optional)",
             "start (optional)",
             "description (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "clone_container",
@@ -1032,7 +1018,8 @@
             "pool (optional)",
             "target (optional)",
             "snapname (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "delete_container",
@@ -1043,7 +1030,8 @@
             "purge (optional)",
             "destroy-unreferenced-disks (optional)",
             "force (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "resize_container_disk",
@@ -1054,7 +1042,8 @@
             "disk",
             "size",
             "digest (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "move_container_disk",
@@ -1069,7 +1058,8 @@
             "bwlimit (optional)",
             "target-vmid (optional)",
             "target-disk (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "migrate_container",
@@ -1083,7 +1073,8 @@
             "timeout (optional)",
             "bwlimit (optional)",
             "targetstorage (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "list_container_snapshots",
@@ -1091,7 +1082,8 @@
           "inputs": [
             "node",
             "vmid"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "create_container_snapshot",
@@ -1101,7 +1093,8 @@
             "vmid",
             "snapname",
             "description (optional)"
-          ]
+          ],
+          "tier": "operate"
         },
         {
           "name": "rollback_container_snapshot",
@@ -1111,7 +1104,8 @@
             "vmid",
             "snapname",
             "start (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "delete_container_snapshot",
@@ -1121,7 +1115,8 @@
             "vmid",
             "snapname",
             "force (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "get_container_firewall_rules",
@@ -1129,7 +1124,8 @@
           "inputs": [
             "node",
             "vmid"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "add_container_firewall_rule",
@@ -1147,7 +1143,8 @@
             "comment (optional)",
             "enable (optional)",
             "pos (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "delete_container_firewall_rule",
@@ -1157,7 +1154,8 @@
             "vmid",
             "pos",
             "digest (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "get_container_firewall_options",
@@ -1165,7 +1163,8 @@
           "inputs": [
             "node",
             "vmid"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "set_container_firewall_options",
@@ -1181,7 +1180,8 @@
             "ipfilter (optional)",
             "log_level_in (optional)",
             "log_level_out (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "get_container_rrddata",
@@ -1191,7 +1191,8 @@
             "vmid",
             "timeframe",
             "cf (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "convert_container_to_template",
@@ -1199,7 +1200,8 @@
           "inputs": [
             "node",
             "vmid"
-          ]
+          ],
+          "tier": "admin"
         }
       ]
     },
@@ -1214,36 +1216,16 @@
             "node (optional)",
             "type (optional)",
             "enabled (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_storage_config",
           "description": "Get configuration for a specific storage.",
           "inputs": [
             "storage"
-          ]
-        },
-        {
-          "name": "create_storage",
-          "description": "Create a new storage configuration.",
-          "inputs": [
-            "storage",
-            "type",
-            "path (optional)",
-            "server (optional)",
-            "export (optional)",
-            "share (optional)",
-            "username (optional)",
-            "password (optional)",
-            "vgname (optional)",
-            "thinpool (optional)",
-            "pool (optional)",
-            "content (optional)",
-            "nodes (optional)",
-            "shared (optional)",
-            "disable (optional)",
-            "maxfiles (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "update_storage",
@@ -1257,14 +1239,8 @@
             "maxfiles (optional)",
             "delete (optional)",
             "digest (optional)"
-          ]
-        },
-        {
-          "name": "delete_storage",
-          "description": "Delete a storage configuration.",
-          "inputs": [
-            "storage"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "get_node_storage_status",
@@ -1272,7 +1248,8 @@
           "inputs": [
             "node",
             "storage"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "list_storage_content",
@@ -1282,7 +1259,8 @@
             "storage",
             "content (optional)",
             "vmid (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_storage_volume_info",
@@ -1291,17 +1269,8 @@
             "node",
             "storage",
             "volume"
-          ]
-        },
-        {
-          "name": "delete_storage_volume",
-          "description": "Delete a volume from storage.",
-          "inputs": [
-            "node",
-            "storage",
-            "volume",
-            "delay (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "copy_storage_volume",
@@ -1312,21 +1281,8 @@
             "volume",
             "target",
             "target_node (optional)"
-          ]
-        },
-        {
-          "name": "download_url_to_storage",
-          "description": "Download a file from a URL directly to storage on a node: an ISO, a container template, or a disk image for import (content=import, PVE 8.4+; .qcow2, .raw, .vmdk, .img or .ova) that create_vm/import_vm_disk can then use via import-from.",
-          "inputs": [
-            "node",
-            "storage",
-            "url",
-            "content",
-            "filename",
-            "checksum (optional)",
-            "checksum_algorithm (optional)",
-            "verify_certificates (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "backup_vm",
@@ -1348,7 +1304,8 @@
             "pigz (optional)",
             "remove (optional)",
             "all (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "restore_vm_backup",
@@ -1365,7 +1322,8 @@
             "bwlimit (optional)",
             "pool (optional)",
             "live-restore (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "restore_container_backup",
@@ -1382,7 +1340,8 @@
             "bwlimit (optional)",
             "pool (optional)",
             "unprivileged (optional)"
-          ]
+          ],
+          "tier": "admin"
         }
       ]
     },
@@ -1393,31 +1352,36 @@
         {
           "name": "get_cluster_status",
           "description": "Get overall cluster status (nodes, quorum).",
-          "inputs": []
+          "inputs": [],
+          "tier": "read"
         },
         {
           "name": "get_cluster_resources",
           "description": "Get all cluster resources (nodes, VMs, containers, storage, pools) with usage stats.",
           "inputs": [
             "type (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_cluster_version",
           "description": "Get Proxmox VE API version.",
-          "inputs": []
+          "inputs": [],
+          "tier": "read"
         },
         {
           "name": "get_cluster_nextid",
           "description": "Get the next available VM/CT ID in the cluster.",
           "inputs": [
             "vmid (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_cluster_options",
           "description": "Get cluster-wide configuration options.",
-          "inputs": []
+          "inputs": [],
+          "tier": "read"
         },
         {
           "name": "set_cluster_options",
@@ -1434,19 +1398,22 @@
             "registered-tags (optional)",
             "tag-style (optional)",
             "delete (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "get_cluster_log",
           "description": "Get cluster-wide log entries.",
           "inputs": [
             "max (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "list_cluster_tasks",
           "description": "List recent cluster-wide tasks.",
-          "inputs": []
+          "inputs": [],
+          "tier": "read"
         },
         {
           "name": "list_node_tasks",
@@ -1462,7 +1429,8 @@
             "vmid (optional)",
             "since (optional)",
             "until (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_task_status",
@@ -1470,7 +1438,8 @@
           "inputs": [
             "node",
             "upid"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_task_log",
@@ -1481,7 +1450,8 @@
             "limit (optional)",
             "start (optional)",
             "download (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "stop_task",
@@ -1489,21 +1459,24 @@
           "inputs": [
             "node",
             "upid"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "list_ha_resources",
           "description": "List all HA-managed resources.",
           "inputs": [
             "type (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_ha_resource",
           "description": "Get HA configuration for a specific resource.",
           "inputs": [
             "sid"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "add_ha_resource",
@@ -1515,7 +1488,8 @@
             "max_restart (optional)",
             "max_relocate (optional)",
             "comment (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "update_ha_resource",
@@ -1529,38 +1503,44 @@
             "comment (optional)",
             "delete (optional)",
             "digest (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "delete_ha_resource",
           "description": "Remove a resource from HA management.",
           "inputs": [
             "sid"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "list_ha_groups",
           "description": "List all HA groups.",
-          "inputs": []
+          "inputs": [],
+          "tier": "read"
         },
         {
           "name": "get_ha_status",
           "description": "Get HA manager status.",
-          "inputs": []
+          "inputs": [],
+          "tier": "read"
         },
         {
           "name": "list_replication_jobs",
           "description": "List all replication jobs.",
           "inputs": [
             "guest (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_replication_job",
           "description": "Get configuration of a replication job.",
           "inputs": [
             "id"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "create_replication_job",
@@ -1573,7 +1553,8 @@
             "rate (optional)",
             "comment (optional)",
             "disable (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "update_replication_job",
@@ -1586,7 +1567,8 @@
             "disable (optional)",
             "delete (optional)",
             "digest (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "delete_replication_job",
@@ -1595,19 +1577,22 @@
             "id",
             "force (optional)",
             "keep (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "list_backup_jobs",
           "description": "List all scheduled backup jobs.",
-          "inputs": []
+          "inputs": [],
+          "tier": "read"
         },
         {
           "name": "get_backup_job",
           "description": "Get a scheduled backup job configuration.",
           "inputs": [
             "id"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "create_backup_job",
@@ -1630,7 +1615,8 @@
             "protected (optional)",
             "pool (optional)",
             "comment (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "update_backup_job",
@@ -1644,14 +1630,16 @@
             "prune-backups (optional)",
             "delete (optional)",
             "digest (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "delete_backup_job",
           "description": "Delete a scheduled backup job.",
           "inputs": [
             "id"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "bulk_start_guests",
@@ -1659,7 +1647,8 @@
           "inputs": [
             "vms (optional)",
             "force (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "bulk_shutdown_guests",
@@ -1667,7 +1656,8 @@
           "inputs": [
             "vms (optional)",
             "force_stop (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "bulk_migrate_guests",
@@ -1677,45 +1667,20 @@
             "vms (optional)",
             "maxworkers (optional)",
             "with_local_disks (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "list_metrics_servers",
           "description": "List configured external metrics servers (InfluxDB, Graphite).",
-          "inputs": []
-        },
-        {
-          "name": "create_metrics_server",
-          "description": "Add an external metrics server.",
-          "inputs": [
-            "id",
-            "type",
-            "server",
-            "port",
-            "disable (optional)",
-            "timeout (optional)",
-            "path (optional)",
-            "protocol (optional)",
-            "organization (optional)",
-            "bucket (optional)",
-            "token (optional)",
-            "mtu (optional)",
-            "api-path-prefix (optional)",
-            "max-body-size (optional)",
-            "verify-certificate (optional)"
-          ]
-        },
-        {
-          "name": "delete_metrics_server",
-          "description": "Remove an external metrics server.",
-          "inputs": [
-            "id"
-          ]
+          "inputs": [],
+          "tier": "read"
         },
         {
           "name": "list_realm_sync_jobs",
           "description": "List realm sync jobs.",
-          "inputs": []
+          "inputs": [],
+          "tier": "read"
         },
         {
           "name": "analyze_schedule",
@@ -1724,7 +1689,8 @@
             "schedule",
             "iterations (optional)",
             "starttime (optional)"
-          ]
+          ],
+          "tier": "read"
         }
       ]
     },
@@ -1738,301 +1704,64 @@
           "inputs": [
             "enabled (optional)",
             "full (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_user",
           "description": "Get a specific user's configuration.",
           "inputs": [
             "userid"
-          ]
-        },
-        {
-          "name": "create_user",
-          "description": "Create a new Proxmox user.",
-          "inputs": [
-            "userid",
-            "password (optional)",
-            "email (optional)",
-            "firstname (optional)",
-            "lastname (optional)",
-            "comment (optional)",
-            "groups (optional)",
-            "enable (optional)",
-            "expire (optional)",
-            "keys (optional)"
-          ]
-        },
-        {
-          "name": "update_user",
-          "description": "Update a Proxmox user.",
-          "inputs": [
-            "userid",
-            "email (optional)",
-            "firstname (optional)",
-            "lastname (optional)",
-            "comment (optional)",
-            "groups (optional)",
-            "enable (optional)",
-            "expire (optional)",
-            "keys (optional)",
-            "append (optional)",
-            "delete (optional)"
-          ]
-        },
-        {
-          "name": "delete_user",
-          "description": "Delete a Proxmox user.",
-          "inputs": [
-            "userid"
-          ]
-        },
-        {
-          "name": "change_user_password",
-          "description": "Change a user's password.",
-          "inputs": [
-            "userid",
-            "password",
-            "confirmation-password (optional)"
-          ]
-        },
-        {
-          "name": "list_user_tokens",
-          "description": "List API tokens for a user.",
-          "inputs": [
-            "userid"
-          ]
-        },
-        {
-          "name": "get_user_token",
-          "description": "Get configuration for a specific API token.",
-          "inputs": [
-            "userid",
-            "tokenid"
-          ]
-        },
-        {
-          "name": "create_user_token",
-          "description": "Create an API token for a user.",
-          "inputs": [
-            "userid",
-            "tokenid",
-            "comment (optional)",
-            "expire (optional)",
-            "privsep (optional)"
-          ]
-        },
-        {
-          "name": "update_user_token",
-          "description": "Update an API token.",
-          "inputs": [
-            "userid",
-            "tokenid",
-            "comment (optional)",
-            "expire (optional)",
-            "privsep (optional)",
-            "delete (optional)"
-          ]
-        },
-        {
-          "name": "delete_user_token",
-          "description": "Delete an API token.",
-          "inputs": [
-            "userid",
-            "tokenid"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "list_groups",
           "description": "List all groups.",
-          "inputs": []
+          "inputs": [],
+          "tier": "read"
         },
         {
           "name": "get_group",
           "description": "Get a group's configuration and members.",
           "inputs": [
             "groupid"
-          ]
-        },
-        {
-          "name": "create_group",
-          "description": "Create a new group.",
-          "inputs": [
-            "groupid",
-            "comment (optional)"
-          ]
-        },
-        {
-          "name": "update_group",
-          "description": "Update a group.",
-          "inputs": [
-            "groupid",
-            "comment (optional)"
-          ]
-        },
-        {
-          "name": "delete_group",
-          "description": "Delete a group.",
-          "inputs": [
-            "groupid"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "list_roles",
           "description": "List all roles and their privileges.",
-          "inputs": []
+          "inputs": [],
+          "tier": "read"
         },
         {
           "name": "get_role",
           "description": "Get a role's privileges.",
           "inputs": [
             "roleid"
-          ]
-        },
-        {
-          "name": "create_role",
-          "description": "Create a custom role.",
-          "inputs": [
-            "roleid",
-            "privs (optional)"
-          ]
-        },
-        {
-          "name": "update_role",
-          "description": "Update a role's privileges.",
-          "inputs": [
-            "roleid",
-            "privs (optional)",
-            "append (optional)"
-          ]
-        },
-        {
-          "name": "delete_role",
-          "description": "Delete a custom role.",
-          "inputs": [
-            "roleid"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_acl",
           "description": "Get the access control list (permissions tree).",
-          "inputs": []
-        },
-        {
-          "name": "update_acl",
-          "description": "Add or remove an ACL entry.",
-          "inputs": [
-            "path",
-            "roles",
-            "users (optional)",
-            "groups (optional)",
-            "tokens (optional)",
-            "propagate (optional)",
-            "delete (optional)"
-          ]
+          "inputs": [],
+          "tier": "read"
         },
         {
           "name": "list_auth_domains",
           "description": "List all authentication domains/realms.",
-          "inputs": []
+          "inputs": [],
+          "tier": "read"
         },
         {
           "name": "get_auth_domain",
           "description": "Get configuration for an authentication domain.",
           "inputs": [
             "realm"
-          ]
-        },
-        {
-          "name": "create_auth_domain",
-          "description": "Create a new authentication domain (LDAP, AD, OpenID).",
-          "inputs": [
-            "realm",
-            "type",
-            "server1 (optional)",
-            "server2 (optional)",
-            "base_dn (optional)",
-            "bind_dn (optional)",
-            "password (optional)",
-            "user_attr (optional)",
-            "default (optional)",
-            "comment (optional)",
-            "port (optional)",
-            "secure (optional)",
-            "tfa (optional)",
-            "sync-defaults-options (optional)",
-            "issuer-url (optional)",
-            "client-id (optional)",
-            "client-key (optional)",
-            "username-claim (optional)"
-          ]
-        },
-        {
-          "name": "update_auth_domain",
-          "description": "Update an authentication domain configuration.",
-          "inputs": [
-            "realm",
-            "comment (optional)",
-            "default (optional)",
-            "delete (optional)",
-            "digest (optional)"
-          ]
-        },
-        {
-          "name": "delete_auth_domain",
-          "description": "Delete an authentication domain.",
-          "inputs": [
-            "realm"
-          ]
-        },
-        {
-          "name": "sync_auth_domain",
-          "description": "Sync users/groups from an LDAP/AD/OpenID realm.",
-          "inputs": [
-            "realm",
-            "dry-run (optional)",
-            "enable-new (optional)",
-            "full (optional)",
-            "purge (optional)",
-            "scope (optional)",
-            "remove-vanished (optional)"
-          ]
-        },
-        {
-          "name": "list_tfa",
-          "description": "List TFA configurations for all users.",
-          "inputs": [
-            "userid (optional)"
-          ]
-        },
-        {
-          "name": "get_user_tfa",
-          "description": "Get TFA configuration for a specific user.",
-          "inputs": [
-            "userid"
-          ]
-        },
-        {
-          "name": "add_tfa",
-          "description": "Add a TFA entry for a user.",
-          "inputs": [
-            "userid",
-            "type",
-            "description (optional)",
-            "totp (optional)",
-            "value (optional)",
-            "challenge (optional)",
-            "password (optional)"
-          ]
-        },
-        {
-          "name": "delete_tfa",
-          "description": "Delete a TFA entry for a user.",
-          "inputs": [
-            "userid",
-            "id",
-            "password (optional)"
-          ]
+          ],
+          "tier": "read"
         }
       ]
     },
@@ -2043,261 +1772,64 @@
         {
           "name": "list_cluster_firewall_rules",
           "description": "List all cluster-level firewall rules.",
-          "inputs": []
-        },
-        {
-          "name": "add_cluster_firewall_rule",
-          "description": "Add a cluster-level firewall rule.",
-          "inputs": [
-            "type",
-            "action",
-            "proto (optional)",
-            "dport (optional)",
-            "sport (optional)",
-            "source (optional)",
-            "dest (optional)",
-            "macro (optional)",
-            "comment (optional)",
-            "enable (optional)",
-            "pos (optional)"
-          ]
-        },
-        {
-          "name": "update_cluster_firewall_rule",
-          "description": "Update a cluster-level firewall rule.",
-          "inputs": [
-            "pos",
-            "type (optional)",
-            "action (optional)",
-            "proto (optional)",
-            "dport (optional)",
-            "source (optional)",
-            "dest (optional)",
-            "enable (optional)",
-            "comment (optional)",
-            "digest (optional)",
-            "moveto (optional)",
-            "delete (optional)"
-          ]
-        },
-        {
-          "name": "delete_cluster_firewall_rule",
-          "description": "Delete a cluster-level firewall rule.",
-          "inputs": [
-            "pos",
-            "digest (optional)"
-          ]
+          "inputs": [],
+          "tier": "read"
         },
         {
           "name": "get_cluster_firewall_options",
           "description": "Get cluster firewall options.",
-          "inputs": []
-        },
-        {
-          "name": "set_cluster_firewall_options",
-          "description": "Set cluster firewall options.",
-          "inputs": [
-            "enable (optional)",
-            "policy_in (optional)",
-            "policy_out (optional)",
-            "log_ratelimit (optional)",
-            "ebtables (optional)",
-            "delete (optional)",
-            "digest (optional)"
-          ]
+          "inputs": [],
+          "tier": "read"
         },
         {
           "name": "list_firewall_groups",
           "description": "List all firewall security groups.",
-          "inputs": []
-        },
-        {
-          "name": "create_firewall_group",
-          "description": "Create a firewall security group.",
-          "inputs": [
-            "group",
-            "comment (optional)",
-            "rename (optional)",
-            "digest (optional)"
-          ]
-        },
-        {
-          "name": "delete_firewall_group",
-          "description": "Delete a firewall security group.",
-          "inputs": [
-            "group"
-          ]
+          "inputs": [],
+          "tier": "read"
         },
         {
           "name": "list_firewall_group_rules",
           "description": "List rules inside a firewall security group.",
           "inputs": [
             "group"
-          ]
-        },
-        {
-          "name": "add_firewall_group_rule",
-          "description": "Add a rule to a firewall security group.",
-          "inputs": [
-            "group",
-            "type",
-            "action",
-            "proto (optional)",
-            "dport (optional)",
-            "source (optional)",
-            "dest (optional)",
-            "comment (optional)",
-            "enable (optional)",
-            "pos (optional)"
-          ]
-        },
-        {
-          "name": "delete_firewall_group_rule",
-          "description": "Delete a rule from a firewall security group.",
-          "inputs": [
-            "group",
-            "pos",
-            "digest (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "list_firewall_aliases",
           "description": "List all firewall aliases (named IPs/CIDRs).",
-          "inputs": []
-        },
-        {
-          "name": "create_firewall_alias",
-          "description": "Create a firewall alias.",
-          "inputs": [
-            "name",
-            "cidr",
-            "comment (optional)"
-          ]
-        },
-        {
-          "name": "update_firewall_alias",
-          "description": "Update a firewall alias.",
-          "inputs": [
-            "name",
-            "cidr (optional)",
-            "comment (optional)",
-            "rename (optional)",
-            "digest (optional)"
-          ]
-        },
-        {
-          "name": "delete_firewall_alias",
-          "description": "Delete a firewall alias.",
-          "inputs": [
-            "name",
-            "digest (optional)"
-          ]
+          "inputs": [],
+          "tier": "read"
         },
         {
           "name": "list_firewall_ipsets",
           "description": "List all firewall IPsets.",
-          "inputs": []
-        },
-        {
-          "name": "create_firewall_ipset",
-          "description": "Create a firewall IPset.",
-          "inputs": [
-            "name",
-            "comment (optional)",
-            "rename (optional)",
-            "digest (optional)"
-          ]
-        },
-        {
-          "name": "delete_firewall_ipset",
-          "description": "Delete a firewall IPset.",
-          "inputs": [
-            "name",
-            "force (optional)"
-          ]
+          "inputs": [],
+          "tier": "read"
         },
         {
           "name": "list_firewall_ipset_entries",
           "description": "List IPs in a firewall IPset.",
           "inputs": [
             "name"
-          ]
-        },
-        {
-          "name": "add_firewall_ipset_entry",
-          "description": "Add an IP/CIDR to a firewall IPset.",
-          "inputs": [
-            "name",
-            "cidr",
-            "comment (optional)",
-            "nomatch (optional)"
-          ]
-        },
-        {
-          "name": "delete_firewall_ipset_entry",
-          "description": "Remove an IP/CIDR from a firewall IPset.",
-          "inputs": [
-            "name",
-            "cidr",
-            "digest (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "list_node_firewall_rules",
           "description": "List firewall rules for a node.",
           "inputs": [
             "node"
-          ]
-        },
-        {
-          "name": "add_node_firewall_rule",
-          "description": "Add a firewall rule to a node.",
-          "inputs": [
-            "node",
-            "type",
-            "action",
-            "proto (optional)",
-            "dport (optional)",
-            "source (optional)",
-            "dest (optional)",
-            "comment (optional)",
-            "enable (optional)",
-            "pos (optional)"
-          ]
-        },
-        {
-          "name": "delete_node_firewall_rule",
-          "description": "Delete a firewall rule from a node.",
-          "inputs": [
-            "node",
-            "pos",
-            "digest (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_node_firewall_options",
           "description": "Get firewall options for a node.",
           "inputs": [
             "node"
-          ]
-        },
-        {
-          "name": "set_node_firewall_options",
-          "description": "Set firewall options for a node.",
-          "inputs": [
-            "node",
-            "enable (optional)",
-            "log_level_in (optional)",
-            "log_level_out (optional)",
-            "tcp_flags_log_level (optional)",
-            "smurf_log_level (optional)",
-            "nosmurfs (optional)",
-            "tcpflags (optional)",
-            "nf_conntrack_max (optional)",
-            "nf_conntrack_tcp_timeout_established (optional)",
-            "delete (optional)",
-            "digest (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_node_firewall_log",
@@ -2308,7 +1840,8 @@
             "start (optional)",
             "since (optional)",
             "until (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_cluster_firewall_log",
@@ -2318,19 +1851,22 @@
             "start (optional)",
             "since (optional)",
             "until (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "list_firewall_macros",
           "description": "List available firewall macros (e.g. SSH, HTTP, Ping).",
-          "inputs": []
+          "inputs": [],
+          "tier": "read"
         },
         {
           "name": "list_firewall_refs",
           "description": "List firewall rule references (aliases and IPsets).",
           "inputs": [
             "type (optional)"
-          ]
+          ],
+          "tier": "read"
         }
       ]
     },
@@ -2346,7 +1882,8 @@
             "include-partitions (optional)",
             "skipsmart (optional)",
             "type (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_disk_smart",
@@ -2355,51 +1892,16 @@
             "node",
             "disk",
             "healthonly (optional)"
-          ]
-        },
-        {
-          "name": "wipe_disk",
-          "description": "Wipe a disk (destroy all data). USE WITH CAUTION.",
-          "inputs": [
-            "node",
-            "disk"
-          ]
-        },
-        {
-          "name": "init_disk_gpt",
-          "description": "Initialize a disk with a GPT partition table.",
-          "inputs": [
-            "node",
-            "disk",
-            "uuid (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "list_lvm_groups",
           "description": "List LVM volume groups on a node.",
           "inputs": [
             "node"
-          ]
-        },
-        {
-          "name": "create_lvm_group",
-          "description": "Create an LVM volume group on a node.",
-          "inputs": [
-            "node",
-            "name",
-            "device",
-            "add_storage (optional)"
-          ]
-        },
-        {
-          "name": "delete_lvm_group",
-          "description": "Delete an LVM volume group.",
-          "inputs": [
-            "node",
-            "name",
-            "cleanup-config (optional)",
-            "cleanup-disks (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "list_lvmthin_pools",
@@ -2407,35 +1909,16 @@
           "inputs": [
             "node",
             "vg (optional)"
-          ]
-        },
-        {
-          "name": "create_lvmthin_pool",
-          "description": "Create an LVM thin pool on a node.",
-          "inputs": [
-            "node",
-            "name",
-            "device",
-            "add_storage (optional)"
-          ]
-        },
-        {
-          "name": "delete_lvmthin_pool",
-          "description": "Delete an LVM thin pool.",
-          "inputs": [
-            "node",
-            "name",
-            "volume-group",
-            "cleanup-config (optional)",
-            "cleanup-disks (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "list_zfs_pools",
           "description": "List ZFS pools on a node.",
           "inputs": [
             "node"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_zfs_pool",
@@ -2443,60 +1926,16 @@
           "inputs": [
             "node",
             "name"
-          ]
-        },
-        {
-          "name": "create_zfs_pool",
-          "description": "Create a ZFS pool on a node.",
-          "inputs": [
-            "node",
-            "name",
-            "devices",
-            "raidlevel",
-            "ashift (optional)",
-            "compression (optional)",
-            "add_storage (optional)"
-          ]
-        },
-        {
-          "name": "delete_zfs_pool",
-          "description": "Delete a ZFS pool.",
-          "inputs": [
-            "node",
-            "name",
-            "cleanup-config (optional)",
-            "cleanup-disks (optional)",
-            "force (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "list_directory_storage",
           "description": "List directory-based storages on a node.",
           "inputs": [
             "node"
-          ]
-        },
-        {
-          "name": "create_directory_storage",
-          "description": "Create a directory-based storage on a node.",
-          "inputs": [
-            "node",
-            "name",
-            "path",
-            "device (optional)",
-            "filesystem (optional)",
-            "add_storage (optional)"
-          ]
-        },
-        {
-          "name": "delete_directory_storage",
-          "description": "Delete a directory-based storage on a node.",
-          "inputs": [
-            "node",
-            "name",
-            "cleanup-config (optional)",
-            "cleanup-disks (optional)"
-          ]
+          ],
+          "tier": "read"
         }
       ]
     },
@@ -2509,19 +1948,22 @@
           "description": "Get Ceph cluster status from a node.",
           "inputs": [
             "node"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_cluster_ceph_status",
           "description": "Get Ceph cluster status from cluster level.",
-          "inputs": []
+          "inputs": [],
+          "tier": "read"
         },
         {
           "name": "get_ceph_crush",
           "description": "Get the CRUSH map for the Ceph cluster.",
           "inputs": [
             "node"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_ceph_log",
@@ -2529,50 +1971,32 @@
           "inputs": [
             "node",
             "limit (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_ceph_config",
           "description": "Get raw Ceph configuration.",
           "inputs": [
             "node"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_ceph_config_db",
           "description": "Get Ceph config-key database.",
           "inputs": [
             "node"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "list_ceph_osds",
           "description": "List all Ceph OSDs.",
           "inputs": [
             "node"
-          ]
-        },
-        {
-          "name": "create_ceph_osd",
-          "description": "Create a new Ceph OSD on a disk.",
-          "inputs": [
-            "node",
-            "dev",
-            "db_dev (optional)",
-            "wal_dev (optional)",
-            "encrypted (optional)",
-            "crush-device-class (optional)"
-          ]
-        },
-        {
-          "name": "delete_ceph_osd",
-          "description": "Destroy a Ceph OSD.",
-          "inputs": [
-            "node",
-            "osdid",
-            "cleanup (optional)",
-            "destroy (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "set_ceph_osd_in",
@@ -2580,7 +2004,8 @@
           "inputs": [
             "node",
             "osdid"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "set_ceph_osd_out",
@@ -2588,14 +2013,16 @@
           "inputs": [
             "node",
             "osdid"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "list_ceph_mons",
           "description": "List Ceph monitor daemons.",
           "inputs": [
             "node"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "create_ceph_mon",
@@ -2604,22 +2031,16 @@
             "node",
             "monid (optional)",
             "mon-address (optional)"
-          ]
-        },
-        {
-          "name": "delete_ceph_mon",
-          "description": "Remove a Ceph monitor.",
-          "inputs": [
-            "node",
-            "monid"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "list_ceph_mgrs",
           "description": "List Ceph manager daemons.",
           "inputs": [
             "node"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "create_ceph_mgr",
@@ -2627,22 +2048,16 @@
           "inputs": [
             "node",
             "id (optional)"
-          ]
-        },
-        {
-          "name": "delete_ceph_mgr",
-          "description": "Remove a Ceph manager daemon.",
-          "inputs": [
-            "node",
-            "id"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "list_ceph_mds",
           "description": "List Ceph MDS (metadata server) daemons.",
           "inputs": [
             "node"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "create_ceph_mds",
@@ -2651,22 +2066,16 @@
             "node",
             "name (optional)",
             "hotstandby (optional)"
-          ]
-        },
-        {
-          "name": "delete_ceph_mds",
-          "description": "Remove a Ceph MDS daemon.",
-          "inputs": [
-            "node",
-            "name"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "list_ceph_pools",
           "description": "List Ceph storage pools.",
           "inputs": [
             "node"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_ceph_pool",
@@ -2674,7 +2083,8 @@
           "inputs": [
             "node",
             "name"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "create_ceph_pool",
@@ -2689,7 +2099,8 @@
             "crush_rule (optional)",
             "application (optional)",
             "add_storages (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "update_ceph_pool",
@@ -2703,25 +2114,16 @@
             "pg_autoscale_mode (optional)",
             "crush_rule (optional)",
             "application (optional)"
-          ]
-        },
-        {
-          "name": "delete_ceph_pool",
-          "description": "Delete a Ceph pool.",
-          "inputs": [
-            "node",
-            "name",
-            "force (optional)",
-            "remove_storages (optional)",
-            "remove_ecprofile (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "list_ceph_fs",
           "description": "List CephFS filesystems.",
           "inputs": [
             "node"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "create_ceph_fs",
@@ -2731,7 +2133,8 @@
             "name (optional)",
             "add-storage (optional)",
             "pg_num (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "start_ceph",
@@ -2739,15 +2142,8 @@
           "inputs": [
             "node",
             "service (optional)"
-          ]
-        },
-        {
-          "name": "stop_ceph",
-          "description": "Stop Ceph services on a node.",
-          "inputs": [
-            "node",
-            "service (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "restart_ceph",
@@ -2755,19 +2151,22 @@
           "inputs": [
             "node",
             "service (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "get_cluster_ceph_metadata",
           "description": "Get Ceph daemon metadata (versions, host info).",
           "inputs": [
             "type (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_cluster_ceph_flags",
           "description": "Get Ceph cluster flags (e.g. noout, norebalance, noscrub).",
-          "inputs": []
+          "inputs": [],
+          "tier": "read"
         },
         {
           "name": "set_cluster_ceph_flags",
@@ -2783,7 +2182,8 @@
             "pause (optional)",
             "noup (optional)",
             "nodown (optional)"
-          ]
+          ],
+          "tier": "admin"
         }
       ]
     },
@@ -2792,135 +2192,32 @@
       "description": "ACME accounts and plugins, node certificates",
       "capabilities": [
         {
-          "name": "list_acme_accounts",
-          "description": "List registered ACME accounts.",
-          "inputs": []
-        },
-        {
-          "name": "get_acme_account",
-          "description": "Get details of an ACME account.",
-          "inputs": [
-            "name"
-          ]
-        },
-        {
-          "name": "register_acme_account",
-          "description": "Register a new ACME account (Let's Encrypt).",
-          "inputs": [
-            "name (optional)",
-            "contact",
-            "directory (optional)",
-            "tos_url (optional)"
-          ]
-        },
-        {
-          "name": "deregister_acme_account",
-          "description": "Deregister an ACME account.",
-          "inputs": [
-            "name"
-          ]
-        },
-        {
-          "name": "list_acme_plugins",
-          "description": "List ACME challenge plugins.",
-          "inputs": [
-            "type (optional)"
-          ]
-        },
-        {
-          "name": "get_acme_plugin",
-          "description": "Get an ACME plugin configuration.",
-          "inputs": [
-            "id"
-          ]
-        },
-        {
-          "name": "create_acme_plugin",
-          "description": "Create an ACME DNS challenge plugin.",
-          "inputs": [
-            "id",
-            "type",
-            "api (optional)",
-            "data (optional)",
-            "disable (optional)",
-            "validation-delay (optional)"
-          ]
-        },
-        {
-          "name": "update_acme_plugin",
-          "description": "Update an ACME plugin.",
-          "inputs": [
-            "id",
-            "data (optional)",
-            "disable (optional)",
-            "delete (optional)",
-            "digest (optional)"
-          ]
-        },
-        {
-          "name": "delete_acme_plugin",
-          "description": "Delete an ACME plugin.",
-          "inputs": [
-            "id"
-          ]
-        },
-        {
           "name": "get_node_certificates",
           "description": "Get certificate info for a node.",
           "inputs": [
             "node"
-          ]
-        },
-        {
-          "name": "order_node_acme_cert",
-          "description": "Order or renew an ACME certificate for a node.",
-          "inputs": [
-            "node",
-            "force (optional)"
-          ]
-        },
-        {
-          "name": "revoke_node_acme_cert",
-          "description": "Revoke the ACME certificate for a node.",
-          "inputs": [
-            "node"
-          ]
-        },
-        {
-          "name": "upload_node_custom_cert",
-          "description": "Upload a custom TLS certificate for a node.",
-          "inputs": [
-            "node",
-            "certificates",
-            "key (optional)",
-            "force (optional)",
-            "restart (optional)"
-          ]
-        },
-        {
-          "name": "delete_node_custom_cert",
-          "description": "Delete the custom TLS certificate for a node (reverts to self-signed).",
-          "inputs": [
-            "node",
-            "restart (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "list_acme_directories",
           "description": "List available ACME directory URLs (Let's Encrypt, staging, etc.).",
-          "inputs": []
+          "inputs": [],
+          "tier": "read"
         },
         {
           "name": "get_acme_tos",
           "description": "Get the Terms of Service URL for an ACME directory.",
           "inputs": [
             "directory (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "list_acme_challenge_schemas",
           "description": "List available ACME DNS challenge schemas (supported DNS providers).",
-          "inputs": []
+          "inputs": [],
+          "tier": "read"
         }
       ]
     },
@@ -2931,7 +2228,8 @@
         {
           "name": "apply_sdn",
           "description": "Apply pending SDN configuration changes cluster-wide.",
-          "inputs": []
+          "inputs": [],
+          "tier": "admin"
         },
         {
           "name": "list_sdn_zones",
@@ -2940,7 +2238,8 @@
             "pending (optional)",
             "running (optional)",
             "type (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_sdn_zone",
@@ -2949,7 +2248,8 @@
             "zone",
             "pending (optional)",
             "running (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "create_sdn_zone",
@@ -2970,7 +2270,8 @@
             "dns (optional)",
             "reversedns (optional)",
             "dnszone (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "update_sdn_zone",
@@ -2982,14 +2283,16 @@
             "ipam (optional)",
             "delete (optional)",
             "digest (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "delete_sdn_zone",
           "description": "Delete an SDN zone.",
           "inputs": [
             "zone"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "list_sdn_vnets",
@@ -2997,7 +2300,8 @@
           "inputs": [
             "pending (optional)",
             "running (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "get_sdn_vnet",
@@ -3006,7 +2310,8 @@
             "vnet",
             "pending (optional)",
             "running (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "create_sdn_vnet",
@@ -3017,7 +2322,8 @@
             "tag (optional)",
             "alias (optional)",
             "vlanaware (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "update_sdn_vnet",
@@ -3029,14 +2335,16 @@
             "vlanaware (optional)",
             "delete (optional)",
             "digest (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "delete_sdn_vnet",
           "description": "Delete an SDN VNet.",
           "inputs": [
             "vnet"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "list_sdn_subnets",
@@ -3045,7 +2353,8 @@
             "vnet",
             "pending (optional)",
             "running (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "create_sdn_subnet",
@@ -3059,7 +2368,8 @@
             "dhcp-range (optional)",
             "dhcp-dns-server (optional)",
             "dnszoneprefix (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "delete_sdn_subnet",
@@ -3067,21 +2377,24 @@
           "inputs": [
             "vnet",
             "subnet"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "list_node_sdn_zones",
           "description": "List SDN zones visible from a node.",
           "inputs": [
             "node"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "list_node_sdn_vnets",
           "description": "List SDN VNets visible from a node.",
           "inputs": [
             "node"
-          ]
+          ],
+          "tier": "read"
         }
       ]
     },
@@ -3092,205 +2405,68 @@
         {
           "name": "list_notification_targets",
           "description": "List all notification targets (combined view of all endpoint types).",
-          "inputs": []
+          "inputs": [],
+          "tier": "read"
         },
         {
           "name": "list_gotify_endpoints",
           "description": "List Gotify notification endpoints.",
-          "inputs": []
+          "inputs": [],
+          "tier": "read"
         },
         {
           "name": "get_gotify_endpoint",
           "description": "Get a Gotify endpoint configuration.",
           "inputs": [
             "name"
-          ]
-        },
-        {
-          "name": "create_gotify_endpoint",
-          "description": "Create a Gotify notification endpoint.",
-          "inputs": [
-            "name",
-            "server",
-            "token",
-            "comment (optional)",
-            "disable (optional)"
-          ]
-        },
-        {
-          "name": "update_gotify_endpoint",
-          "description": "Update a Gotify endpoint.",
-          "inputs": [
-            "name",
-            "server (optional)",
-            "token (optional)",
-            "comment (optional)",
-            "disable (optional)",
-            "delete (optional)",
-            "digest (optional)"
-          ]
-        },
-        {
-          "name": "delete_gotify_endpoint",
-          "description": "Delete a Gotify endpoint.",
-          "inputs": [
-            "name"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "list_sendmail_endpoints",
           "description": "List sendmail notification endpoints.",
-          "inputs": []
+          "inputs": [],
+          "tier": "read"
         },
         {
           "name": "get_sendmail_endpoint",
           "description": "Get a sendmail endpoint configuration.",
           "inputs": [
             "name"
-          ]
-        },
-        {
-          "name": "create_sendmail_endpoint",
-          "description": "Create a sendmail notification endpoint.",
-          "inputs": [
-            "name",
-            "mailto (optional)",
-            "mailto-user (optional)",
-            "from-address (optional)",
-            "author (optional)",
-            "comment (optional)",
-            "disable (optional)"
-          ]
-        },
-        {
-          "name": "update_sendmail_endpoint",
-          "description": "Update a sendmail endpoint.",
-          "inputs": [
-            "name",
-            "mailto (optional)",
-            "mailto-user (optional)",
-            "from-address (optional)",
-            "author (optional)",
-            "comment (optional)",
-            "disable (optional)",
-            "delete (optional)",
-            "digest (optional)"
-          ]
-        },
-        {
-          "name": "delete_sendmail_endpoint",
-          "description": "Delete a sendmail endpoint.",
-          "inputs": [
-            "name"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "list_smtp_endpoints",
           "description": "List SMTP notification endpoints.",
-          "inputs": []
-        },
-        {
-          "name": "create_smtp_endpoint",
-          "description": "Create an SMTP notification endpoint.",
-          "inputs": [
-            "name",
-            "server",
-            "port (optional)",
-            "mailto (optional)",
-            "mailto-user (optional)",
-            "from-address",
-            "author (optional)",
-            "mode (optional)",
-            "username (optional)",
-            "password (optional)",
-            "comment (optional)",
-            "disable (optional)"
-          ]
-        },
-        {
-          "name": "delete_smtp_endpoint",
-          "description": "Delete an SMTP endpoint.",
-          "inputs": [
-            "name"
-          ]
+          "inputs": [],
+          "tier": "read"
         },
         {
           "name": "list_webhook_endpoints",
           "description": "List webhook notification endpoints.",
-          "inputs": []
-        },
-        {
-          "name": "create_webhook_endpoint",
-          "description": "Create a webhook notification endpoint.",
-          "inputs": [
-            "name",
-            "url",
-            "method",
-            "secret (optional)",
-            "header (optional)",
-            "body (optional)",
-            "comment (optional)",
-            "disable (optional)"
-          ]
-        },
-        {
-          "name": "delete_webhook_endpoint",
-          "description": "Delete a webhook endpoint.",
-          "inputs": [
-            "name"
-          ]
+          "inputs": [],
+          "tier": "read"
         },
         {
           "name": "list_notification_matchers",
           "description": "List notification matchers (routing rules).",
-          "inputs": []
+          "inputs": [],
+          "tier": "read"
         },
         {
           "name": "get_notification_matcher",
           "description": "Get a notification matcher configuration.",
           "inputs": [
             "name"
-          ]
-        },
-        {
-          "name": "create_notification_matcher",
-          "description": "Create a notification matcher.",
-          "inputs": [
-            "name",
-            "target (optional)",
-            "match-field (optional)",
-            "match-severity (optional)",
-            "match-calendar (optional)",
-            "invert-match (optional)",
-            "comment (optional)",
-            "disable (optional)",
-            "mode (optional)"
-          ]
-        },
-        {
-          "name": "update_notification_matcher",
-          "description": "Update a notification matcher.",
-          "inputs": [
-            "name",
-            "target (optional)",
-            "match-field (optional)",
-            "match-severity (optional)",
-            "disable (optional)",
-            "delete (optional)",
-            "digest (optional)"
-          ]
-        },
-        {
-          "name": "delete_notification_matcher",
-          "description": "Delete a notification matcher.",
-          "inputs": [
-            "name"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "list_notification_matcher_fields",
           "description": "List available notification matcher field names (e.g. type, hostname, job-id).",
-          "inputs": []
+          "inputs": [],
+          "tier": "read"
         }
       ]
     },
@@ -3301,7 +2477,8 @@
         {
           "name": "list_pools",
           "description": "List all resource pools.",
-          "inputs": []
+          "inputs": [],
+          "tier": "read"
         },
         {
           "name": "get_pool",
@@ -3309,7 +2486,8 @@
           "inputs": [
             "poolid",
             "type (optional)"
-          ]
+          ],
+          "tier": "read"
         },
         {
           "name": "create_pool",
@@ -3317,7 +2495,8 @@
           "inputs": [
             "poolid",
             "comment (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "update_pool",
@@ -3329,14 +2508,16 @@
             "storage (optional)",
             "delete (optional)",
             "allow-move (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "delete_pool",
           "description": "Delete a resource pool.",
           "inputs": [
             "poolid"
-          ]
+          ],
+          "tier": "admin"
         }
       ]
     },
@@ -3367,7 +2548,8 @@
             "onboot (optional)",
             "tags (optional)",
             "description (optional)"
-          ]
+          ],
+          "tier": "admin"
         },
         {
           "name": "deploy_cloud_vms",
@@ -3393,70 +2575,26 @@
             "onboot (optional)",
             "tags (optional)",
             "description (optional)"
-          ]
+          ],
+          "tier": "admin"
         }
       ]
     }
   ],
   "requirements": {
-    "python": ">=3.10",
-    "dependencies": [
-      "mcp>=1.0.0,<2",
-      "httpx>=0.28.1",
-      "python-dotenv>=1.2.3"
-    ],
-    "proxmox": "Proxmox VE 6.0 or later"
-  },
-  "permissions": {
-    "recommended": [
-      "VM.Monitor",
-      "VM.Audit",
-      "VM.PowerMgmt",
-      "VM.Snapshot",
-      "Datastore.Audit",
-      "Sys.Audit"
-    ],
-    "description": "Recommended privileges for monitoring, power management and snapshots. Other tools need more (e.g. VM.Allocate, VM.Config.*, Datastore.Allocate, Sys.Modify, Permissions.Modify). Grant only what your use case needs; PVEAuditor is enough for read-only monitoring."
-  },
-  "endpoints": {
-    "mcp": {
-      "type": "stdio",
-      "command": "uv",
-      "args": [
-        "--directory",
-        "/path/to/proxmox-mcp-server",
-        "run",
-        "proxmox-mcp-server"
-      ]
-    },
-    "docker": {
-      "type": "stdio",
-      "command": "docker",
-      "args": [
-        "run",
-        "-i",
-        "--rm",
-        "--env-file",
-        ".env",
-        "ghcr.io/ry-ops/proxmox-mcp-server:latest"
-      ]
-    }
+    "broker_os": "Windows Server 2025",
+    "python": ">=3.12"
   },
   "metadata": {
     "license": "MIT",
-    "repository": "https://github.com/ry-ops/proxmox-mcp-server",
-    "documentation": "https://github.com/ry-ops/proxmox-mcp-server#readme",
-    "issues": "https://github.com/ry-ops/proxmox-mcp-server/issues",
-    "author": "ry-ops",
+    "upstream": "https://github.com/ry-ops/proxmox-mcp-server",
+    "upstream_author": "ry-ops",
+    "documentation": "README.md, docs/ARCHITECTURE.md, docs/SECURITY.md",
     "tags": [
       "proxmox",
       "virtualization",
-      "infrastructure",
-      "automation",
-      "devops",
-      "ai-agent",
-      "a2a",
-      "mcp"
+      "mcp",
+      "cloudflare-access"
     ]
   }
 }

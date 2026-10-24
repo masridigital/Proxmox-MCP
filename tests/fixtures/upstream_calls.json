@@ -1,0 +1,5604 @@
+{
+ "repo_commit": "a63576c",
+ "tool_count": 340,
+ "tools": {
+  "add_cluster_firewall_rule": {
+   "args": {
+    "action": "ACCEPT",
+    "type": "in"
+   },
+   "calls": [
+    [
+     "POST",
+     "/cluster/firewall/rules",
+     [
+      [
+       "action",
+       "ACCEPT"
+      ],
+      [
+       "type",
+       "in"
+      ]
+     ]
+    ]
+   ],
+   "module": "firewall",
+   "tool_sha256": "eb50db867b4baa7031a9abeba204fcb767d7c9bdde55b2ff8b7a6e5af6fbbf53"
+  },
+  "add_container_firewall_rule": {
+   "args": {
+    "action": "ACCEPT",
+    "node": "pve1",
+    "type": "in",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/lxc/100/firewall/rules",
+     [
+      [
+       "action",
+       "ACCEPT"
+      ],
+      [
+       "type",
+       "in"
+      ]
+     ]
+    ]
+   ],
+   "module": "lxc",
+   "tool_sha256": "56ae7d55422583c1a249d098068c8a8ac3f5267026317f6838f51d1b1a4cdd76"
+  },
+  "add_firewall_group_rule": {
+   "args": {
+    "action": "ACCEPT",
+    "group": "grp1",
+    "type": "in"
+   },
+   "calls": [
+    [
+     "POST",
+     "/cluster/firewall/groups/grp1",
+     [
+      [
+       "action",
+       "ACCEPT"
+      ],
+      [
+       "type",
+       "in"
+      ]
+     ]
+    ]
+   ],
+   "module": "firewall",
+   "tool_sha256": "b5abc3b3059ac40a0d0862599d25c3d0f873302f0442fc986e1288807a9c5dbe"
+  },
+  "add_firewall_ipset_entry": {
+   "args": {
+    "cidr": "192.0.2.0/24",
+    "name": "name1"
+   },
+   "calls": [
+    [
+     "POST",
+     "/cluster/firewall/ipset/name1",
+     [
+      [
+       "cidr",
+       "192.0.2.0/24"
+      ]
+     ]
+    ]
+   ],
+   "module": "firewall",
+   "tool_sha256": "917f288a88a7e868f346521245b3bd4895ddf2fbd932fd505446631b1aaf56e5"
+  },
+  "add_ha_resource": {
+   "args": {
+    "sid": "vm:100"
+   },
+   "calls": [
+    [
+     "POST",
+     "/cluster/ha/resources",
+     [
+      [
+       "sid",
+       "vm:100"
+      ]
+     ]
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "6c02ad3691be475b34b13d0c174586dd53074b5ad98543fd65f3d19c6f242c65"
+  },
+  "add_node_firewall_rule": {
+   "args": {
+    "action": "ACCEPT",
+    "node": "pve1",
+    "type": "in"
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/firewall/rules",
+     [
+      [
+       "action",
+       "ACCEPT"
+      ],
+      [
+       "type",
+       "in"
+      ]
+     ]
+    ]
+   ],
+   "module": "firewall",
+   "tool_sha256": "ff9ec6578a8fb9cc52da8328b81947bb3cfbdca35935adc2835f025729b5b333"
+  },
+  "add_tfa": {
+   "args": {
+    "type": "totp",
+    "userid": "jdoe@pve"
+   },
+   "calls": [
+    [
+     "POST",
+     "/access/tfa/jdoe@pve",
+     [
+      [
+       "type",
+       "totp"
+      ]
+     ]
+    ]
+   ],
+   "module": "access",
+   "tool_sha256": "324d4d09d10bce7a4b4051c87ba51a6f4fcc5d97e1c92dc8a5e837437fbdbf94"
+  },
+  "add_vm_firewall_rule": {
+   "args": {
+    "action": "ACCEPT",
+    "node": "pve1",
+    "type": "in",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/qemu/100/firewall/rules",
+     [
+      [
+       "action",
+       "ACCEPT"
+      ],
+      [
+       "type",
+       "in"
+      ]
+     ]
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "81da112c626c153c1252a48eaaee00f5e0dc792345012fa9175602b700e61aaa"
+  },
+  "analyze_schedule": {
+   "args": {
+    "schedule": "daily"
+   },
+   "calls": [
+    [
+     "POST",
+     "/cluster/jobs/schedule-analyze",
+     [
+      [
+       "schedule",
+       "daily"
+      ]
+     ]
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "e9c01d1e8efed1f5ed57c2b178badc7fcf545dd29f8a31743fde224bc1d17087"
+  },
+  "apply_node_network": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "PUT",
+     "/nodes/pve1/network",
+     []
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "51028ed5f85e6d23ab0d198c1a35de4084ae6a6d3bb7424b1c79d52447a02439"
+  },
+  "apply_sdn": {
+   "args": {},
+   "calls": [
+    [
+     "PUT",
+     "/cluster/sdn",
+     []
+    ]
+   ],
+   "module": "sdn",
+   "tool_sha256": "bcf11fd941c3c8b4d4a50811084cbe47a23ec9060ab9fbf9f47df2ee1949dc09"
+  },
+  "backup_vm": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/vzdump",
+     []
+    ]
+   ],
+   "module": "storage",
+   "tool_sha256": "04290df823acbb38fe70dbe2c9842fe4f79330f3d587ffdc3b55485ea41a8f47"
+  },
+  "bulk_migrate_guests": {
+   "args": {
+    "target": "pve2"
+   },
+   "calls": [
+    [
+     "POST",
+     "/cluster/bulk-action/guest/migrate",
+     [
+      [
+       "target",
+       "pve2"
+      ]
+     ]
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "bc3828bec4429cb1f65d2f128f53884443a8d9bc3d727194732d14386195e15f"
+  },
+  "bulk_shutdown_guests": {
+   "args": {},
+   "calls": [
+    [
+     "POST",
+     "/cluster/bulk-action/guest/shutdown",
+     []
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "59f5196e5f9b448078ebadcab5ee441b7d439f7f12a1c80aacd81a8b6769fe14"
+  },
+  "bulk_start_guests": {
+   "args": {},
+   "calls": [
+    [
+     "POST",
+     "/cluster/bulk-action/guest/start",
+     []
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "41b0e0055bae9ea845294e19a304b3939d5e7eaf4609f7b9461b1afea552dc5d"
+  },
+  "change_user_password": {
+   "args": {
+    "password": "not-a-real-password",
+    "userid": "jdoe@pve"
+   },
+   "calls": [
+    [
+     "PUT",
+     "/access/password",
+     [
+      [
+       "password",
+       "not-a-real-password"
+      ],
+      [
+       "userid",
+       "jdoe@pve"
+      ]
+     ]
+    ]
+   ],
+   "module": "access",
+   "tool_sha256": "20843cc5de07c9d341b3974e621e8c0fb5495d86c2f94ef7b922fb489a75413d"
+  },
+  "clone_container": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/lxc/100/clone",
+     []
+    ]
+   ],
+   "module": "lxc",
+   "tool_sha256": "e3280c0adc37b5024734ebeebb2bb48ee533fdb7d8647e34afd2d7a4bbde45ca"
+  },
+  "clone_vm": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/qemu/100/clone",
+     []
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "459212f4bd3ccbaf5d9d4a55d6ef1f218d692d5e5c8ae373d9f1780bec27da9f"
+  },
+  "convert_container_to_template": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/lxc/100/template",
+     []
+    ]
+   ],
+   "module": "lxc",
+   "tool_sha256": "f431196bc0538b351d05cc7b4b836358cc5259993b19b6458a6be76b9b36a7c6"
+  },
+  "convert_vm_to_template": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/qemu/100/template",
+     []
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "4b7f214f6874aaf01057fb01197dacef89351c9f32190fe44f0ac245bcf74e2b"
+  },
+  "copy_storage_volume": {
+   "args": {
+    "node": "pve1",
+    "storage": "local",
+    "target": "local:iso/copy.iso",
+    "volume": "local:iso/test.iso"
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/storage/local/content/local%3Aiso%2Ftest.iso",
+     [
+      [
+       "target",
+       "local:iso/copy.iso"
+      ]
+     ]
+    ]
+   ],
+   "module": "storage",
+   "tool_sha256": "78a5718d74427a399cddaaf05b7ec8665f5fbf8f659714ec021065d3b9b97d7f"
+  },
+  "create_acme_plugin": {
+   "args": {
+    "id": "job1",
+    "type": "dns"
+   },
+   "calls": [
+    [
+     "POST",
+     "/cluster/acme/plugins",
+     [
+      [
+       "id",
+       "job1"
+      ],
+      [
+       "type",
+       "dns"
+      ]
+     ]
+    ]
+   ],
+   "module": "acme",
+   "tool_sha256": "96eda0260f78e653f9de76501807481c39505be70c1c222598dad1b14b6eb430"
+  },
+  "create_auth_domain": {
+   "args": {
+    "realm": "corp",
+    "type": "ldap"
+   },
+   "calls": [
+    [
+     "POST",
+     "/access/domains",
+     [
+      [
+       "realm",
+       "corp"
+      ],
+      [
+       "type",
+       "ldap"
+      ]
+     ]
+    ]
+   ],
+   "module": "access",
+   "tool_sha256": "eb9d2d990dbec42f7cebf18a5baae9b77898bf86a843860ff701ac60d6d16a7f"
+  },
+  "create_backup_job": {
+   "args": {},
+   "calls": [
+    [
+     "POST",
+     "/cluster/backup",
+     []
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "144417702cff22e4a0b1f5685e35b07b1e8bcff29ce8ee6ddd850195e93b5ce9"
+  },
+  "create_ceph_fs": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/ceph/fs",
+     []
+    ]
+   ],
+   "module": "ceph",
+   "tool_sha256": "9eda34fdb25da3dcfc1048f08a02e4e2dae203366ee3fae3c42d01d249db36e7"
+  },
+  "create_ceph_mds": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/ceph/mds",
+     []
+    ]
+   ],
+   "module": "ceph",
+   "tool_sha256": "d272531456fdb8e0e6fea364ce401cdda79eeaa53c59da8911f63d978e9204ba"
+  },
+  "create_ceph_mgr": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/ceph/mgr",
+     []
+    ]
+   ],
+   "module": "ceph",
+   "tool_sha256": "1787b002a61d17cbf616a40ca4c9d59f28ac16d043931be39fdd932a311a0c48"
+  },
+  "create_ceph_mon": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/ceph/mon",
+     []
+    ]
+   ],
+   "module": "ceph",
+   "tool_sha256": "aa1ee10cc72165af73b123e888258ea864f7ef190f0eaa911f4c8d4dcc847169"
+  },
+  "create_ceph_osd": {
+   "args": {
+    "dev": "/dev/sdb",
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/ceph/osd",
+     [
+      [
+       "dev",
+       "/dev/sdb"
+      ]
+     ]
+    ]
+   ],
+   "module": "ceph",
+   "tool_sha256": "5b2cbb0b7b1875906d0f8f97c7d204af2247a42d6df52fa2e0ad20e28dc2f4a8"
+  },
+  "create_ceph_pool": {
+   "args": {
+    "name": "name1",
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/ceph/pool",
+     [
+      [
+       "name",
+       "name1"
+      ]
+     ]
+    ]
+   ],
+   "module": "ceph",
+   "tool_sha256": "4765cdd1f52dc18948c0116646af0dcdf57ebff56217e11190935ce82f11bee4"
+  },
+  "create_container": {
+   "args": {
+    "node": "pve1",
+    "ostemplate": "local:vztmpl/debian-12-standard_12.7-1_amd64.tar.zst"
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/lxc",
+     [
+      [
+       "ostemplate",
+       "local:vztmpl/debian-12-standard_12.7-1_amd64.tar.zst"
+      ]
+     ]
+    ]
+   ],
+   "module": "lxc",
+   "tool_sha256": "289553a1ccc9458b5b7872c2e25ad4624f8e4c5d82b885d7d56457d569763433"
+  },
+  "create_container_snapshot": {
+   "args": {
+    "node": "pve1",
+    "snapname": "snap1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/lxc/100/snapshot",
+     [
+      [
+       "snapname",
+       "snap1"
+      ]
+     ]
+    ]
+   ],
+   "module": "lxc",
+   "tool_sha256": "01f8151fbf27ec408dca5d5c0d67548b2f30911c8092ab5ff9149bf4b6a3c2e7"
+  },
+  "create_directory_storage": {
+   "args": {
+    "name": "name1",
+    "node": "pve1",
+    "path": "/mnt/data"
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/disks/directory",
+     [
+      [
+       "name",
+       "name1"
+      ],
+      [
+       "path",
+       "/mnt/data"
+      ]
+     ]
+    ]
+   ],
+   "module": "disks",
+   "tool_sha256": "4150e66a0ad2fc414619e11bb07fc1c41c4a818f9753af9673421f994614a9db"
+  },
+  "create_firewall_alias": {
+   "args": {
+    "cidr": "192.0.2.0/24",
+    "name": "name1"
+   },
+   "calls": [
+    [
+     "POST",
+     "/cluster/firewall/aliases",
+     [
+      [
+       "cidr",
+       "192.0.2.0/24"
+      ],
+      [
+       "name",
+       "name1"
+      ]
+     ]
+    ]
+   ],
+   "module": "firewall",
+   "tool_sha256": "36ee8aba6baa5355d4b92231419bb1640bb1898aef72a7d9c1634638f3fcff2f"
+  },
+  "create_firewall_group": {
+   "args": {
+    "group": "grp1"
+   },
+   "calls": [
+    [
+     "POST",
+     "/cluster/firewall/groups",
+     [
+      [
+       "group",
+       "grp1"
+      ]
+     ]
+    ]
+   ],
+   "module": "firewall",
+   "tool_sha256": "9cc79d3db13794a9985089c8b7bd3810e63ee7500db7e9a6b6249c31857ecba0"
+  },
+  "create_firewall_ipset": {
+   "args": {
+    "name": "name1"
+   },
+   "calls": [
+    [
+     "POST",
+     "/cluster/firewall/ipset",
+     [
+      [
+       "name",
+       "name1"
+      ]
+     ]
+    ]
+   ],
+   "module": "firewall",
+   "tool_sha256": "35fd706cb6dd4d7eaa84609f493bc1344ab31cbb76334bfb0b7f00a286b9f475"
+  },
+  "create_gotify_endpoint": {
+   "args": {
+    "name": "name1",
+    "server": "https://gotify.example.com",
+    "token": "not-a-real-token"
+   },
+   "calls": [
+    [
+     "POST",
+     "/cluster/notifications/endpoints/gotify",
+     [
+      [
+       "name",
+       "name1"
+      ],
+      [
+       "server",
+       "https://gotify.example.com"
+      ],
+      [
+       "token",
+       "not-a-real-token"
+      ]
+     ]
+    ]
+   ],
+   "module": "notifications",
+   "tool_sha256": "7b1310f00c4586c258b9613ea2a7ab8a915eea6541d49030ba8e0f2ab50d6536"
+  },
+  "create_group": {
+   "args": {
+    "groupid": "grp1"
+   },
+   "calls": [
+    [
+     "POST",
+     "/access/groups",
+     [
+      [
+       "groupid",
+       "grp1"
+      ]
+     ]
+    ]
+   ],
+   "module": "access",
+   "tool_sha256": "784c7c8c5c956afce54f307d3b5a1e963654d32b544f90ca56b9ee56f7c4b506"
+  },
+  "create_lvm_group": {
+   "args": {
+    "device": "/dev/sdb",
+    "name": "name1",
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/disks/lvm",
+     [
+      [
+       "device",
+       "/dev/sdb"
+      ],
+      [
+       "name",
+       "name1"
+      ]
+     ]
+    ]
+   ],
+   "module": "disks",
+   "tool_sha256": "c41e4c88c94dc0c53432bfcd2153855c681b9687068362d4d70ec1dc99eb720a"
+  },
+  "create_lvmthin_pool": {
+   "args": {
+    "device": "/dev/sdb",
+    "name": "name1",
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/disks/lvmthin",
+     [
+      [
+       "device",
+       "/dev/sdb"
+      ],
+      [
+       "name",
+       "name1"
+      ]
+     ]
+    ]
+   ],
+   "module": "disks",
+   "tool_sha256": "ca9179bf041559433b8cff4946b588b72a1e9359337bddf60d1af42c6102abe2"
+  },
+  "create_metrics_server": {
+   "args": {
+    "id": "job1",
+    "port": 8086,
+    "server": "192.0.2.10",
+    "type": "influxdb"
+   },
+   "calls": [
+    [
+     "POST",
+     "/cluster/metrics/server/job1",
+     [
+      [
+       "port",
+       "8086"
+      ],
+      [
+       "server",
+       "192.0.2.10"
+      ],
+      [
+       "type",
+       "influxdb"
+      ]
+     ]
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "6a48815ec97de2a73e032ceb5b7cdbe3390e5bce2d84fa4a97ab8c1787f411fe"
+  },
+  "create_notification_matcher": {
+   "args": {
+    "name": "name1"
+   },
+   "calls": [
+    [
+     "POST",
+     "/cluster/notifications/matchers",
+     [
+      [
+       "name",
+       "name1"
+      ]
+     ]
+    ]
+   ],
+   "module": "notifications",
+   "tool_sha256": "6c43996f6d7b769ecb841db79f76798be925cae879592b608b78918ceb13317b"
+  },
+  "create_pool": {
+   "args": {
+    "poolid": "pool1"
+   },
+   "calls": [
+    [
+     "POST",
+     "/pools",
+     [
+      [
+       "poolid",
+       "pool1"
+      ]
+     ]
+    ]
+   ],
+   "module": "pools",
+   "tool_sha256": "e8ca2cd656f3a817683f4b0950599219bcc39dd3664b3125b9d4801480b5e2fa"
+  },
+  "create_replication_job": {
+   "args": {
+    "id": "100-0",
+    "target": "pve2",
+    "type": "local"
+   },
+   "calls": [
+    [
+     "POST",
+     "/cluster/replication",
+     [
+      [
+       "id",
+       "100-0"
+      ],
+      [
+       "target",
+       "pve2"
+      ],
+      [
+       "type",
+       "local"
+      ]
+     ]
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "d9be687868cb9b19e4f439ab0b08c9308591465ba8668ff9765e3b5a6565590d"
+  },
+  "create_role": {
+   "args": {
+    "roleid": "Role1"
+   },
+   "calls": [
+    [
+     "POST",
+     "/access/roles",
+     [
+      [
+       "roleid",
+       "Role1"
+      ]
+     ]
+    ]
+   ],
+   "module": "access",
+   "tool_sha256": "5dd968227890bcbb134666eec0de78b6d116c05948b0a029b094570fa6d99b8f"
+  },
+  "create_sdn_subnet": {
+   "args": {
+    "subnet": "zone1-192.0.2.0-24",
+    "type": "subnet",
+    "vnet": "vnet1"
+   },
+   "calls": [
+    [
+     "POST",
+     "/cluster/sdn/vnets/vnet1/subnets",
+     [
+      [
+       "subnet",
+       "zone1-192.0.2.0-24"
+      ],
+      [
+       "type",
+       "subnet"
+      ]
+     ]
+    ]
+   ],
+   "module": "sdn",
+   "tool_sha256": "780a3644da716f00af153faf1c12d67f2078869c074a856f27e03013f41a3377"
+  },
+  "create_sdn_vnet": {
+   "args": {
+    "vnet": "vnet1",
+    "zone": "zone1"
+   },
+   "calls": [
+    [
+     "POST",
+     "/cluster/sdn/vnets",
+     [
+      [
+       "vnet",
+       "vnet1"
+      ],
+      [
+       "zone",
+       "zone1"
+      ]
+     ]
+    ]
+   ],
+   "module": "sdn",
+   "tool_sha256": "c31f43e58469b9948b981ab67d41e73202dc29ea514c0019f9e26ad81463b632"
+  },
+  "create_sdn_zone": {
+   "args": {
+    "type": "simple",
+    "zone": "zone1"
+   },
+   "calls": [
+    [
+     "POST",
+     "/cluster/sdn/zones",
+     [
+      [
+       "type",
+       "simple"
+      ],
+      [
+       "zone",
+       "zone1"
+      ]
+     ]
+    ]
+   ],
+   "module": "sdn",
+   "tool_sha256": "ea6352fbd4997ef0594d1ee2b17a1ddb0fa56a977f002889c1133b3dcadf02b4"
+  },
+  "create_sendmail_endpoint": {
+   "args": {
+    "name": "name1"
+   },
+   "calls": [
+    [
+     "POST",
+     "/cluster/notifications/endpoints/sendmail",
+     [
+      [
+       "name",
+       "name1"
+      ]
+     ]
+    ]
+   ],
+   "module": "notifications",
+   "tool_sha256": "c205eed332ddaf17e1d241aa90d80a0d582335f93039d40299a1c16c3705b462"
+  },
+  "create_smtp_endpoint": {
+   "args": {
+    "from-address": "pve@example.com",
+    "name": "name1",
+    "server": "smtp.example.com"
+   },
+   "calls": [
+    [
+     "POST",
+     "/cluster/notifications/endpoints/smtp",
+     [
+      [
+       "from-address",
+       "pve@example.com"
+      ],
+      [
+       "name",
+       "name1"
+      ],
+      [
+       "server",
+       "smtp.example.com"
+      ]
+     ]
+    ]
+   ],
+   "module": "notifications",
+   "tool_sha256": "6fd09282374e60bc89363e99b95d168e92c84599f98051fd2e0989d4c87311cf"
+  },
+  "create_storage": {
+   "args": {
+    "storage": "local",
+    "type": "dir"
+   },
+   "calls": [
+    [
+     "POST",
+     "/storage",
+     [
+      [
+       "storage",
+       "local"
+      ],
+      [
+       "type",
+       "dir"
+      ]
+     ]
+    ]
+   ],
+   "module": "storage",
+   "tool_sha256": "45dafc2a914c04d70b75a7d2408fd69876c53fe4fce9f3a71868757fcb20418f"
+  },
+  "create_user": {
+   "args": {
+    "userid": "jdoe@pve"
+   },
+   "calls": [
+    [
+     "POST",
+     "/access/users",
+     [
+      [
+       "userid",
+       "jdoe@pve"
+      ]
+     ]
+    ]
+   ],
+   "module": "access",
+   "tool_sha256": "f6401f49d61e62d6c4bf7648f29bf5143d7435a1dd8330c67a3e9c750e19bca1"
+  },
+  "create_user_token": {
+   "args": {
+    "tokenid": "tok1",
+    "userid": "jdoe@pve"
+   },
+   "calls": [
+    [
+     "POST",
+     "/access/users/jdoe@pve/token/tok1",
+     []
+    ]
+   ],
+   "module": "access",
+   "tool_sha256": "90d3fff688ff250118a75b3a5ebcde60458e46f50ae252886b11d1b298896cd6"
+  },
+  "create_vm": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/qemu",
+     []
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "b129ab5694a5a413f7906c121312d3ff2531b597b969bfd6bbec807a1967eb19"
+  },
+  "create_vm_snapshot": {
+   "args": {
+    "node": "pve1",
+    "snapname": "snap1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/qemu/100/snapshot",
+     [
+      [
+       "snapname",
+       "snap1"
+      ]
+     ]
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "c28295d5c428f7c215fa8660f86f9fd5e97b92e28fafee4e5bdce05d3a081f99"
+  },
+  "create_webhook_endpoint": {
+   "args": {
+    "method": "POST",
+    "name": "name1",
+    "url": "https://example.com/test.iso"
+   },
+   "calls": [
+    [
+     "POST",
+     "/cluster/notifications/endpoints/webhook",
+     [
+      [
+       "method",
+       "POST"
+      ],
+      [
+       "name",
+       "name1"
+      ],
+      [
+       "url",
+       "https://example.com/test.iso"
+      ]
+     ]
+    ]
+   ],
+   "module": "notifications",
+   "tool_sha256": "905ec2729a48c0813ff9043c397cdf30f49cb888fb3a730d8a897b53dfdb03fc"
+  },
+  "create_zfs_pool": {
+   "args": {
+    "devices": "/dev/sdb",
+    "name": "name1",
+    "node": "pve1",
+    "raidlevel": "single"
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/disks/zfs",
+     [
+      [
+       "devices",
+       "/dev/sdb"
+      ],
+      [
+       "name",
+       "name1"
+      ],
+      [
+       "raidlevel",
+       "single"
+      ]
+     ]
+    ]
+   ],
+   "module": "disks",
+   "tool_sha256": "2e0cad63f7e7e1954af0c8c21580ef0edbae9eff3c6b87d8e8b3f8b0c58d272a"
+  },
+  "delete_acme_plugin": {
+   "args": {
+    "id": "job1"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/cluster/acme/plugins/job1",
+     []
+    ]
+   ],
+   "module": "acme",
+   "tool_sha256": "7d5e26a4b8ba0177daec0c54f16e3d35957adcff3eb393b55d6febdc0e0ddbf8"
+  },
+  "delete_auth_domain": {
+   "args": {
+    "realm": "corp"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/access/domains/corp",
+     []
+    ]
+   ],
+   "module": "access",
+   "tool_sha256": "3dfebe39e3604bda38c759ce3fdf4df5464beb03f5a8edca2cd3fdedf8daf0f6"
+  },
+  "delete_backup_job": {
+   "args": {
+    "id": "job1"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/cluster/backup/job1",
+     []
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "1ba7d7f0ff68b7a777b8cf77626e2641afbf2e7a6ce15d36a65be2bb314dd78e"
+  },
+  "delete_ceph_mds": {
+   "args": {
+    "name": "name1",
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/nodes/pve1/ceph/mds/name1",
+     []
+    ]
+   ],
+   "module": "ceph",
+   "tool_sha256": "62a5bfe6efe26f51e1c19ecccc83a40142708e22584ba7ee47db376ff7e607bc"
+  },
+  "delete_ceph_mgr": {
+   "args": {
+    "id": "job1",
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/nodes/pve1/ceph/mgr/job1",
+     []
+    ]
+   ],
+   "module": "ceph",
+   "tool_sha256": "7579236eb3fdb56594cc3d69f7f360cd4a9535e24acb858f2833a352ecaf857e"
+  },
+  "delete_ceph_mon": {
+   "args": {
+    "monid": "pve1",
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/nodes/pve1/ceph/mon/pve1",
+     []
+    ]
+   ],
+   "module": "ceph",
+   "tool_sha256": "1aef86ef3af7627bff9e4395dcec523adb07e7b22abacb33b4e4ddd37f24a58e"
+  },
+  "delete_ceph_osd": {
+   "args": {
+    "node": "pve1",
+    "osdid": 0
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/nodes/pve1/ceph/osd/0",
+     []
+    ]
+   ],
+   "module": "ceph",
+   "tool_sha256": "9d1933d3b017e1b6e71262756c125cd7614a014f6949901fcaf75c68bc80fb83"
+  },
+  "delete_ceph_pool": {
+   "args": {
+    "name": "name1",
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/nodes/pve1/ceph/pool/name1",
+     []
+    ]
+   ],
+   "module": "ceph",
+   "tool_sha256": "faad2b5cc337cb9a1a2f64125ec65d12b3eb41f03366eeb424f0af333f0f211a"
+  },
+  "delete_cluster_firewall_rule": {
+   "args": {
+    "pos": 0
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/cluster/firewall/rules/0",
+     []
+    ]
+   ],
+   "module": "firewall",
+   "tool_sha256": "950ced9f39bc2a6d0d0258bf078ec05420841fff683315d3491acf8b60874e52"
+  },
+  "delete_container": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/nodes/pve1/lxc/100",
+     []
+    ]
+   ],
+   "module": "lxc",
+   "tool_sha256": "c3845dee344d5899d4b266563966f94ade0bca22dd9758d06806f3fa788f36d4"
+  },
+  "delete_container_firewall_rule": {
+   "args": {
+    "node": "pve1",
+    "pos": 0,
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/nodes/pve1/lxc/100/firewall/rules/0",
+     []
+    ]
+   ],
+   "module": "lxc",
+   "tool_sha256": "8dd154ca56ee3925a9a4c1c3e8e6f6132fe57138e76fecbc93dd5dd0a2b5df8a"
+  },
+  "delete_container_snapshot": {
+   "args": {
+    "node": "pve1",
+    "snapname": "snap1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/nodes/pve1/lxc/100/snapshot/snap1",
+     []
+    ]
+   ],
+   "module": "lxc",
+   "tool_sha256": "ecb661f19b793f904a80be2c8b525165d3b0f8049eaea2194e4e0f6337ec047d"
+  },
+  "delete_directory_storage": {
+   "args": {
+    "name": "name1",
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/nodes/pve1/disks/directory/name1",
+     []
+    ]
+   ],
+   "module": "disks",
+   "tool_sha256": "be6d1fffac2e08c92188782d33db98a725cdb7e882f1ef7ef7f7501758aeb24e"
+  },
+  "delete_firewall_alias": {
+   "args": {
+    "name": "name1"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/cluster/firewall/aliases/name1",
+     []
+    ]
+   ],
+   "module": "firewall",
+   "tool_sha256": "c94e0e46422ce68865472e8f49fd524986ad12fe1be9a39976eaa7ba49053b0f"
+  },
+  "delete_firewall_group": {
+   "args": {
+    "group": "grp1"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/cluster/firewall/groups/grp1",
+     []
+    ]
+   ],
+   "module": "firewall",
+   "tool_sha256": "094514caca667d14302a460b283e390eea945d081857000eaec870f9fc8e322f"
+  },
+  "delete_firewall_group_rule": {
+   "args": {
+    "group": "grp1",
+    "pos": 0
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/cluster/firewall/groups/grp1/0",
+     []
+    ]
+   ],
+   "module": "firewall",
+   "tool_sha256": "5ad6143f49a3f6698ab4fed5b464a8b3c21cccdb279c8b5a183e18b65fc7803e"
+  },
+  "delete_firewall_ipset": {
+   "args": {
+    "name": "name1"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/cluster/firewall/ipset/name1",
+     []
+    ]
+   ],
+   "module": "firewall",
+   "tool_sha256": "8bad639f6a675e52a1d6a4f24fe6c69a020907be98a4dc30116a466d9c2e48ce"
+  },
+  "delete_firewall_ipset_entry": {
+   "args": {
+    "cidr": "192.0.2.0/24",
+    "name": "name1"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/cluster/firewall/ipset/name1/192.0.2.0%2F24",
+     []
+    ]
+   ],
+   "module": "firewall",
+   "tool_sha256": "95b4a60cf11e60078e73d438363d0fd66aa35c1b6784a913b6c7a3a86dae157a"
+  },
+  "delete_gotify_endpoint": {
+   "args": {
+    "name": "name1"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/cluster/notifications/endpoints/gotify/name1",
+     []
+    ]
+   ],
+   "module": "notifications",
+   "tool_sha256": "0c812f140f7ccecdad1714931ae04893d94460f86f1c655c431ea377ffaf88bc"
+  },
+  "delete_group": {
+   "args": {
+    "groupid": "grp1"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/access/groups/grp1",
+     []
+    ]
+   ],
+   "module": "access",
+   "tool_sha256": "2f960d00550d3ff6da8e18b1e012ad613a8f0bcf2c410d39af2f7ceb76f5f016"
+  },
+  "delete_ha_resource": {
+   "args": {
+    "sid": "vm:100"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/cluster/ha/resources/vm:100",
+     []
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "308ad475a8c0dccc857593fa4b85ff6ba01662776d843b99411dda81a8071b31"
+  },
+  "delete_lvm_group": {
+   "args": {
+    "name": "name1",
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/nodes/pve1/disks/lvm/name1",
+     []
+    ]
+   ],
+   "module": "disks",
+   "tool_sha256": "9ac72f47ff13d15b4a38fcebeb2f10a80718d0d2c4165f6dbced725f2a1fcca0"
+  },
+  "delete_lvmthin_pool": {
+   "args": {
+    "name": "name1",
+    "node": "pve1",
+    "volume-group": "vg1"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/nodes/pve1/disks/lvmthin/name1",
+     [
+      [
+       "volume-group",
+       "vg1"
+      ]
+     ]
+    ]
+   ],
+   "module": "disks",
+   "tool_sha256": "c3b0182bb85e8d2528f013a6094dc34f391899c0eb9b519471c7bde486eb712e"
+  },
+  "delete_metrics_server": {
+   "args": {
+    "id": "job1"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/cluster/metrics/server/job1",
+     []
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "2c503bf834d4ba275c147a04153f5897f19cb2b5bdfd759e797f84689b89e8c7"
+  },
+  "delete_node_custom_cert": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/nodes/pve1/certificates/custom",
+     []
+    ]
+   ],
+   "module": "acme",
+   "tool_sha256": "455e1e1e6e3551988d05a1dc2c9069a71f29926f41bf81dada4e3bc003c68c5f"
+  },
+  "delete_node_firewall_rule": {
+   "args": {
+    "node": "pve1",
+    "pos": 0
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/nodes/pve1/firewall/rules/0",
+     []
+    ]
+   ],
+   "module": "firewall",
+   "tool_sha256": "d813230a959127e8236dde79a907f12edb4e6b56be28c7e326a9f59b4a681844"
+  },
+  "delete_notification_matcher": {
+   "args": {
+    "name": "name1"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/cluster/notifications/matchers/name1",
+     []
+    ]
+   ],
+   "module": "notifications",
+   "tool_sha256": "feb73d381d901565bd9c23fe6e66c1a2bfd14a6ceb4d6d16886ca56ad000f5cc"
+  },
+  "delete_pool": {
+   "args": {
+    "poolid": "pool1"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/pools/pool1",
+     []
+    ]
+   ],
+   "module": "pools",
+   "tool_sha256": "da8a4ac9fbd47f502fd525ad4724a22473eb4de19c65df95c8c7ab9d868ce971"
+  },
+  "delete_replication_job": {
+   "args": {
+    "id": "100-0"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/cluster/replication/100-0",
+     []
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "d318e43f9d399bbcb2c66de1ae02820c3f966c39c209cf806398372d0a37aa34"
+  },
+  "delete_role": {
+   "args": {
+    "roleid": "Role1"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/access/roles/Role1",
+     []
+    ]
+   ],
+   "module": "access",
+   "tool_sha256": "0654ef9b3e97012e363d3d9da49215fdde1254d1497bfebf43fb010318d7f8f5"
+  },
+  "delete_sdn_subnet": {
+   "args": {
+    "subnet": "zone1-192.0.2.0-24",
+    "vnet": "vnet1"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/cluster/sdn/vnets/vnet1/subnets/zone1-192.0.2.0-24",
+     []
+    ]
+   ],
+   "module": "sdn",
+   "tool_sha256": "a0185cdc4785d0ff13c4d6731600446061c38f1c489ef5e87eabe77204932cbc"
+  },
+  "delete_sdn_vnet": {
+   "args": {
+    "vnet": "vnet1"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/cluster/sdn/vnets/vnet1",
+     []
+    ]
+   ],
+   "module": "sdn",
+   "tool_sha256": "3f976c6ffdb1fccd3f113e9883e66b3dbf00c32b21678e33ace0c5e040903643"
+  },
+  "delete_sdn_zone": {
+   "args": {
+    "zone": "zone1"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/cluster/sdn/zones/zone1",
+     []
+    ]
+   ],
+   "module": "sdn",
+   "tool_sha256": "062aaee5de1a8bbd47a043e3b5d0305dbe3fb650e892636e22fa275cbdf7a623"
+  },
+  "delete_sendmail_endpoint": {
+   "args": {
+    "name": "name1"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/cluster/notifications/endpoints/sendmail/name1",
+     []
+    ]
+   ],
+   "module": "notifications",
+   "tool_sha256": "f560523704a8c95b360fc6f3613dc5475b83b153392b8f3a9c4de66f08057cc7"
+  },
+  "delete_smtp_endpoint": {
+   "args": {
+    "name": "name1"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/cluster/notifications/endpoints/smtp/name1",
+     []
+    ]
+   ],
+   "module": "notifications",
+   "tool_sha256": "aeccfb320a9b860545dfb200dd6baf037c46ed3432a89bf2383b4a809d5a4c0c"
+  },
+  "delete_storage": {
+   "args": {
+    "storage": "local"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/storage/local",
+     []
+    ]
+   ],
+   "module": "storage",
+   "tool_sha256": "745ea56b74378a25475c952d99aa4dfe1bb9980db723f1d61c1135ca77da597b"
+  },
+  "delete_storage_volume": {
+   "args": {
+    "node": "pve1",
+    "storage": "local",
+    "volume": "local:iso/test.iso"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/nodes/pve1/storage/local/content/local%3Aiso%2Ftest.iso",
+     []
+    ]
+   ],
+   "module": "storage",
+   "tool_sha256": "98c52b2fd28d5a2954679e8b8078ac027003564c6f9576e30cb492501f244801"
+  },
+  "delete_tfa": {
+   "args": {
+    "id": "job1",
+    "userid": "jdoe@pve"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/access/tfa/jdoe@pve/job1",
+     []
+    ]
+   ],
+   "module": "access",
+   "tool_sha256": "a15641a9fdf49ddf1bde59b5582fb6a377bd3dbc0edd29dfb22705b71707f131"
+  },
+  "delete_user": {
+   "args": {
+    "userid": "jdoe@pve"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/access/users/jdoe@pve",
+     []
+    ]
+   ],
+   "module": "access",
+   "tool_sha256": "52b9db85f40d4c99e56e12fb5eabb735d2ba8cd04cfd025add9668f4537352b2"
+  },
+  "delete_user_token": {
+   "args": {
+    "tokenid": "tok1",
+    "userid": "jdoe@pve"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/access/users/jdoe@pve/token/tok1",
+     []
+    ]
+   ],
+   "module": "access",
+   "tool_sha256": "c57eb06e6b5d32081e59f425609f561c1e962d094fea2730ff7a69bb1456c479"
+  },
+  "delete_vm": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/nodes/pve1/qemu/100",
+     []
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "8228fa48a9d8a562871e87bd7dbcfb91d2bbe45b96aea1618aa3c6af0de90e7f"
+  },
+  "delete_vm_firewall_rule": {
+   "args": {
+    "node": "pve1",
+    "pos": 0,
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/nodes/pve1/qemu/100/firewall/rules/0",
+     []
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "b8453c00753f51ce8842e45b7f5820173411060937d555dbcb8db336fdf8c313"
+  },
+  "delete_vm_snapshot": {
+   "args": {
+    "node": "pve1",
+    "snapname": "snap1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/nodes/pve1/qemu/100/snapshot/snap1",
+     []
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "b4323fbf65cdc614db1fbee47550d9a0b66cd6cd14a61676a5ef30e01cd34c2a"
+  },
+  "delete_webhook_endpoint": {
+   "args": {
+    "name": "name1"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/cluster/notifications/endpoints/webhook/name1",
+     []
+    ]
+   ],
+   "module": "notifications",
+   "tool_sha256": "728f9891c76e2a892226e07d492c02de75f7fe8f88b5866b4117d6fe664fd5cd"
+  },
+  "delete_zfs_pool": {
+   "args": {
+    "name": "name1",
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/nodes/pve1/disks/zfs/name1",
+     []
+    ]
+   ],
+   "module": "disks",
+   "tool_sha256": "6d56f467b49706d127f2ab8bcb820f001506da72a53cc24de510507a8ab2c97d"
+  },
+  "deploy_cloud_vms": {
+   "args": {
+    "image": "local:import/test.qcow2",
+    "names": [
+     "vm1"
+    ],
+    "node": "pve1",
+    "ssh_public_keys": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexample user@example.com"
+   },
+   "calls": [
+    [
+     "GET",
+     "/cluster/resources",
+     [
+      [
+       "type",
+       "vm"
+      ]
+     ]
+    ],
+    [
+     "GET",
+     "/cluster/nextid",
+     []
+    ],
+    [
+     "POST",
+     "/nodes/pve1/qemu",
+     [
+      [
+       "agent",
+       "enabled=1"
+      ],
+      [
+       "boot",
+       "order=scsi0"
+      ],
+      [
+       "ciuser",
+       "ubuntu"
+      ],
+      [
+       "cores",
+       "2"
+      ],
+      [
+       "cpu",
+       "host"
+      ],
+      [
+       "ide2",
+       "local-lvm:cloudinit"
+      ],
+      [
+       "ipconfig0",
+       "ip=dhcp"
+      ],
+      [
+       "memory",
+       "2048"
+      ],
+      [
+       "name",
+       "vm1"
+      ],
+      [
+       "net0",
+       "virtio,bridge=vmbr0"
+      ],
+      [
+       "onboot",
+       "0"
+      ],
+      [
+       "ostype",
+       "l26"
+      ],
+      [
+       "scsi0",
+       "local-lvm:0,import-from=local:import/test.qcow2,discard=on"
+      ],
+      [
+       "scsihw",
+       "virtio-scsi-pci"
+      ],
+      [
+       "serial0",
+       "socket"
+      ],
+      [
+       "sshkeys",
+       "ssh-ed25519%20AAAAC3NzaC1lZDI1NTE5AAAAIexample%20user%40example.com"
+      ],
+      [
+       "tags",
+       "cloud"
+      ],
+      [
+       "vga",
+       "serial0"
+      ],
+      [
+       "vmid",
+       "1000"
+      ]
+     ]
+    ],
+    [
+     "GET",
+     "/nodes/pve1/tasks/UPID:pve1:0000ABCD:00000001:65000000:qmstart:100:mcp-rw@pve!mcp:/status",
+     []
+    ],
+    [
+     "PUT",
+     "/nodes/pve1/qemu/1000/resize",
+     [
+      [
+       "disk",
+       "scsi0"
+      ],
+      [
+       "size",
+       "20G"
+      ]
+     ]
+    ],
+    [
+     "GET",
+     "/nodes/pve1/tasks/UPID:pve1:0000ABCD:00000001:65000000:qmstart:100:mcp-rw@pve!mcp:/status",
+     []
+    ],
+    [
+     "POST",
+     "/nodes/pve1/qemu/1000/status/start",
+     []
+    ],
+    [
+     "GET",
+     "/nodes/pve1/tasks/UPID:pve1:0000ABCD:00000001:65000000:qmstart:100:mcp-rw@pve!mcp:/status",
+     []
+    ],
+    [
+     "GET",
+     "/nodes/pve1/qemu/1000/config",
+     []
+    ]
+   ],
+   "module": "appliances",
+   "tool_sha256": "4b08660e4393d82ae7fd93b167c2e6a390f8514eeba32b622c04d7263414314c"
+  },
+  "deploy_fortigate_vm": {
+   "args": {
+    "image": "local:import/fortios.qcow2",
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/cluster/nextid",
+     []
+    ],
+    [
+     "POST",
+     "/nodes/pve1/qemu",
+     [
+      [
+       "boot",
+       "order=scsi0"
+      ],
+      [
+       "cores",
+       "1"
+      ],
+      [
+       "cpu",
+       "host"
+      ],
+      [
+       "memory",
+       "2048"
+      ],
+      [
+       "name",
+       "fortigate"
+      ],
+      [
+       "net0",
+       "virtio,bridge=vmbr0"
+      ],
+      [
+       "onboot",
+       "0"
+      ],
+      [
+       "ostype",
+       "l26"
+      ],
+      [
+       "scsi0",
+       "local-lvm:0,import-from=local:import/fortios.qcow2"
+      ],
+      [
+       "scsihw",
+       "virtio-scsi-pci"
+      ],
+      [
+       "serial0",
+       "socket"
+      ],
+      [
+       "tags",
+       "fortigate"
+      ],
+      [
+       "vmid",
+       "1000"
+      ]
+     ]
+    ],
+    [
+     "GET",
+     "/nodes/pve1/tasks/UPID:pve1:0000ABCD:00000001:65000000:qmstart:100:mcp-rw@pve!mcp:/status",
+     []
+    ],
+    [
+     "POST",
+     "/nodes/pve1/qemu/1000/status/start",
+     []
+    ],
+    [
+     "GET",
+     "/nodes/pve1/tasks/UPID:pve1:0000ABCD:00000001:65000000:qmstart:100:mcp-rw@pve!mcp:/status",
+     []
+    ],
+    [
+     "GET",
+     "/nodes/pve1/qemu/1000/config",
+     []
+    ]
+   ],
+   "module": "appliances",
+   "tool_sha256": "4d4ca72db6d511b9b4ee3f1760f5c0d70dbe683ef2c47d4c46e30ce397a41d10"
+  },
+  "deregister_acme_account": {
+   "args": {
+    "name": "name1"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/cluster/acme/account/name1",
+     []
+    ]
+   ],
+   "module": "acme",
+   "tool_sha256": "4c009b0c4d989207509da9cf88c761cb8340acad8664ae03ce6bbb578f76fccd"
+  },
+  "download_url_to_storage": {
+   "args": {
+    "content": "iso",
+    "filename": "test.iso",
+    "node": "pve1",
+    "storage": "local",
+    "url": "https://example.com/test.iso"
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/storage/local/download-url",
+     [
+      [
+       "content",
+       "iso"
+      ],
+      [
+       "filename",
+       "test.iso"
+      ],
+      [
+       "url",
+       "https://example.com/test.iso"
+      ]
+     ]
+    ]
+   ],
+   "module": "storage",
+   "tool_sha256": "2fe87a4d1d0368d0ff0076f9856176ed57d5a6c5507a3ccc4aff178b0a863602"
+  },
+  "get_acl": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/access/acl",
+     []
+    ]
+   ],
+   "module": "access",
+   "tool_sha256": "6f6f05c68a33dba27ec036bf5af3d739601ea49e726ad5af78d1d06bfef25dbd"
+  },
+  "get_acme_account": {
+   "args": {
+    "name": "name1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/cluster/acme/account/name1",
+     []
+    ]
+   ],
+   "module": "acme",
+   "tool_sha256": "c330b2c9a430a45c9146ed7b6a2ad731b072c62379cf0956f989a2d24fc8ce9e"
+  },
+  "get_acme_plugin": {
+   "args": {
+    "id": "job1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/cluster/acme/plugins/job1",
+     []
+    ]
+   ],
+   "module": "acme",
+   "tool_sha256": "349d8ed71b6e53d17d9629e5c63a25dc8d37c9494425fcfe0b9c1833e0b16245"
+  },
+  "get_acme_tos": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/acme/tos",
+     []
+    ]
+   ],
+   "module": "acme",
+   "tool_sha256": "5a8e88ca0f69b5138c11a440b9dd33a5ae7cfe8dd610f5356cef41078d573fb8"
+  },
+  "get_auth_domain": {
+   "args": {
+    "realm": "corp"
+   },
+   "calls": [
+    [
+     "GET",
+     "/access/domains/corp",
+     []
+    ]
+   ],
+   "module": "access",
+   "tool_sha256": "7b9bdc067fb886f2fd7eaca522f8234efde2c568ab2e489952ac21cc1a9728d2"
+  },
+  "get_backup_job": {
+   "args": {
+    "id": "job1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/cluster/backup/job1",
+     []
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "ed9e673b420e976015671e7d55a811e8b7da253a0b61215643d636396927f73c"
+  },
+  "get_ceph_config": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/ceph/cfg/raw",
+     []
+    ]
+   ],
+   "module": "ceph",
+   "tool_sha256": "212316b1f5e35f0313cbcdc9471f6dff621b819408b2d6cf6ef971ce2b8e7b86"
+  },
+  "get_ceph_config_db": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/ceph/cfg/db",
+     []
+    ]
+   ],
+   "module": "ceph",
+   "tool_sha256": "e7c8dc5748fa62f7b16942bcd847e3d11941a1a52741f4423ee593c95d8d2050"
+  },
+  "get_ceph_crush": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/ceph/crush",
+     []
+    ]
+   ],
+   "module": "ceph",
+   "tool_sha256": "6f26fd612c0118ef87cb7d37ba930a684ce6baa55ee4a76fb4e237e30103b877"
+  },
+  "get_ceph_log": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/ceph/log",
+     []
+    ]
+   ],
+   "module": "ceph",
+   "tool_sha256": "2caff67b61eb419ea1aae9357f7dec458b6ddbcb5e7172acc9287b6eae55404f"
+  },
+  "get_ceph_pool": {
+   "args": {
+    "name": "name1",
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/ceph/pool/name1",
+     []
+    ]
+   ],
+   "module": "ceph",
+   "tool_sha256": "1769a0761061f62f8a4923673cd97cf86bd637353d14234d489d2c74cb6f4e4c"
+  },
+  "get_ceph_status": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/ceph/status",
+     []
+    ]
+   ],
+   "module": "ceph",
+   "tool_sha256": "792b5f9ed117d661d7a4ae7fc88e40b381123829be44c624570a755b417ca24b"
+  },
+  "get_cluster_ceph_flags": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/ceph/flags",
+     []
+    ]
+   ],
+   "module": "ceph",
+   "tool_sha256": "fc7222d154c8101da6841296bac9a0f7c9b3b2e893d5da81b4e5a4e1461b2c80"
+  },
+  "get_cluster_ceph_metadata": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/ceph/metadata",
+     []
+    ]
+   ],
+   "module": "ceph",
+   "tool_sha256": "0a447d049619009ee5ad9217ed12e3d2bfd8b11941047f1cfaea122166edc562"
+  },
+  "get_cluster_ceph_status": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/ceph/status",
+     []
+    ]
+   ],
+   "module": "ceph",
+   "tool_sha256": "8a301aef48ef580e0c191d6c6411a9412153a471b68ce36d49db91467ca0f6a2"
+  },
+  "get_cluster_firewall_log": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/firewall/log",
+     []
+    ]
+   ],
+   "module": "firewall",
+   "tool_sha256": "727832bbb4c69fb77f6949f6b146efe8201cfa14b823642f3798d6f816f2c5a2"
+  },
+  "get_cluster_firewall_options": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/firewall/options",
+     []
+    ]
+   ],
+   "module": "firewall",
+   "tool_sha256": "0db20fd10372414990194bdd115198119da48de940a2b82274b73ef50033da44"
+  },
+  "get_cluster_log": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/log",
+     []
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "c4c72eb61e76dc3d608e620b6bc40ebae6b9681de956a901f985dde02a380a2e"
+  },
+  "get_cluster_nextid": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/nextid",
+     []
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "a270e3a5f3fcff7e3e064d4eb8c812e8503a14161481dd99b182d4231d5ed6b5"
+  },
+  "get_cluster_options": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/options",
+     []
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "214960be2385a70a0d8b61f0f6ee854adbdaae9556e31cea43a4c72cc3cc752a"
+  },
+  "get_cluster_resources": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/resources",
+     []
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "74f7517555b4ae6d4305b9d591c07fc979bdae51582bde035e3a6c73e491698c"
+  },
+  "get_cluster_status": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/status",
+     []
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "b20ab02a199e110caa08c69477e4d18b19687f682b7e522b1fb0b6714a18fade"
+  },
+  "get_cluster_version": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/version",
+     []
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "f5c215a432f8a5509634a265e3b30f0d194d67a8d5de6a5ce8dde256886eb5bf"
+  },
+  "get_container_config": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/lxc/100/config",
+     []
+    ]
+   ],
+   "module": "lxc",
+   "tool_sha256": "c9a01e21bdf13b0548c0fb59e63dd368a10f1ed13f43061f2e596793124a804a"
+  },
+  "get_container_firewall_options": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/lxc/100/firewall/options",
+     []
+    ]
+   ],
+   "module": "lxc",
+   "tool_sha256": "aa596d066e2db54c14ddc672cccce7b74d21464d8ff376a949615e06412f2370"
+  },
+  "get_container_firewall_rules": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/lxc/100/firewall/rules",
+     []
+    ]
+   ],
+   "module": "lxc",
+   "tool_sha256": "d3b4934d09559fe165bd11f93473c99f17e79b53388249146bfcfdbc62ec1020"
+  },
+  "get_container_pending": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/lxc/100/pending",
+     []
+    ]
+   ],
+   "module": "lxc",
+   "tool_sha256": "6f44c04756c91392c55accf356c10555b5008f7ecf2b8b74d5391f6e0db88fb3"
+  },
+  "get_container_rrddata": {
+   "args": {
+    "node": "pve1",
+    "timeframe": "hour",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/lxc/100/rrddata",
+     [
+      [
+       "timeframe",
+       "hour"
+      ]
+     ]
+    ]
+   ],
+   "module": "lxc",
+   "tool_sha256": "9e6bfe3b37abcd19634309a5b70b47d4f7b433564e60cacf2c8408a94d71e49f"
+  },
+  "get_container_status": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/lxc/100/status/current",
+     []
+    ]
+   ],
+   "module": "lxc",
+   "tool_sha256": "ec1239d9868f84b04bdfaeab9a0b15aed727d641216fc86e872bb50ec24ee793"
+  },
+  "get_disk_smart": {
+   "args": {
+    "disk": "/dev/sda",
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/disks/smart",
+     [
+      [
+       "disk",
+       "/dev/sda"
+      ]
+     ]
+    ]
+   ],
+   "module": "disks",
+   "tool_sha256": "45ba4bf04e612fc7fd870db7076e2c99a5082f519c037793ed0fac81715bd1d4"
+  },
+  "get_gotify_endpoint": {
+   "args": {
+    "name": "name1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/cluster/notifications/endpoints/gotify/name1",
+     []
+    ]
+   ],
+   "module": "notifications",
+   "tool_sha256": "12061f6b6ee208ac54ae9e9a6ece083d1e4fcf224dfc44a9cef659096ad397fe"
+  },
+  "get_group": {
+   "args": {
+    "groupid": "grp1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/access/groups/grp1",
+     []
+    ]
+   ],
+   "module": "access",
+   "tool_sha256": "4d833eb0b409f7f050c73a1db3ce973688cd6f3b79ae23415dd08fc0df3bc5c6"
+  },
+  "get_ha_resource": {
+   "args": {
+    "sid": "vm:100"
+   },
+   "calls": [
+    [
+     "GET",
+     "/cluster/ha/resources/vm:100",
+     []
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "013a6812849dc77a5f48f72c0b630a2973ca0a2fb49c7fae2f1b1a23943155f9"
+  },
+  "get_ha_status": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/ha/status/current",
+     []
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "c9d837a488edc08c9bc4507afdee9a9549a102bf3b1dfd8d367d3ccc03f71146"
+  },
+  "get_node_aplinfo": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/aplinfo",
+     []
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "a74d2047b5f8e39f35f01c77e7eb0b6d2a57c1c860ddeaab5f52a812419c6718"
+  },
+  "get_node_apt_changelog": {
+   "args": {
+    "name": "pve-manager",
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/apt/changelog",
+     [
+      [
+       "name",
+       "pve-manager"
+      ]
+     ]
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "ba1862c042449d38ebbe04277430aabd70931985ecdd36dc1583136bbc7d162e"
+  },
+  "get_node_apt_update": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/apt/update",
+     []
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "1ed5a6e2afc33a5667c646c658517aa810b96827a7b34339b26677ee1dd403d8"
+  },
+  "get_node_capabilities_qemu": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/capabilities/qemu",
+     []
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "b7dba5a2b01595ec02f334816c4a9177d037a86100a11c63eeb00875353a8647"
+  },
+  "get_node_certificates": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/certificates/info",
+     []
+    ]
+   ],
+   "module": "acme",
+   "tool_sha256": "000de27e12d4e5e80a947424be9d7f63e6b8750f0d891507bb14812b55b3dfa3"
+  },
+  "get_node_config": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/config",
+     []
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "faabf42589dcd34c8648156cb41643c6dab1125ad7a0fb76cd097e2cf70f1970"
+  },
+  "get_node_dns": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/dns",
+     []
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "df3edbabc6bb28cf88bb9debf803293b2bb22b8706eacc8b8baedad2cc8c99f7"
+  },
+  "get_node_firewall_log": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/firewall/log",
+     []
+    ]
+   ],
+   "module": "firewall",
+   "tool_sha256": "7a4bbb69cf06a0aef87795bb5903f2b8751b6758dbf95bc744ef68dd47587827"
+  },
+  "get_node_firewall_options": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/firewall/options",
+     []
+    ]
+   ],
+   "module": "firewall",
+   "tool_sha256": "a55585a60c601815e6bad7b1eef49a52d0bd60da7f0a7cbce6e8e3d73c6b40a0"
+  },
+  "get_node_hardware": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/hardware",
+     []
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "d87d3c2c23f50088c7957f1912889a8928e48d78e1b4db33f8742db36b7f4cab"
+  },
+  "get_node_hosts": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/hosts",
+     []
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "5ea7b2d35b8336df4870d918c03e5754f63a69b866c038a0bb6ec6458ffd3782"
+  },
+  "get_node_journal": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/journal",
+     []
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "ce9eba448ef2c396b34806f2eb72b4529aead6cc4565edbb7d3d85a54f538a6b"
+  },
+  "get_node_netstat": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/netstat",
+     []
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "79aad8e38842804a24b3e6b43570e49f998f791fb0b5bc944335d713147e3153"
+  },
+  "get_node_network": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/network",
+     []
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "4e431f03cd577193fa903abc24184e22c7dc39e250bc9a81c705f3ac31599f66"
+  },
+  "get_node_network_interface": {
+   "args": {
+    "iface": "vmbr0",
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/network/vmbr0",
+     []
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "17af362641bd384aa32d8bd281886db834ad7fc94f0df91371306165f1614ac5"
+  },
+  "get_node_report": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/report",
+     []
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "679f2799375de2e68da2f0b459c73c471a63bfc4c2c25decf6ecd23e4b0d223e"
+  },
+  "get_node_rrd": {
+   "args": {
+    "ds": "cpu",
+    "node": "pve1",
+    "timeframe": "hour"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/rrd",
+     [
+      [
+       "ds",
+       "cpu"
+      ],
+      [
+       "timeframe",
+       "hour"
+      ]
+     ]
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "484134fc727b06d91d6e100f94ff4807c1ce8ee1f49b350188bbccd73f4f9553"
+  },
+  "get_node_rrddata": {
+   "args": {
+    "node": "pve1",
+    "timeframe": "hour"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/rrddata",
+     [
+      [
+       "timeframe",
+       "hour"
+      ]
+     ]
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "7eb2196c6c322fc4aac1fba3d168e3ff11129c6611899052467f42cdd84132a8"
+  },
+  "get_node_scan": {
+   "args": {
+    "node": "pve1",
+    "type": "nfs"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/scan/nfs",
+     []
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "a161037f7b84da6506aec5041fd426af0b4c9a6cdfaf122f539768942768f99c"
+  },
+  "get_node_service_state": {
+   "args": {
+    "node": "pve1",
+    "service": "pveproxy"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/services/pveproxy/state",
+     []
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "d3e20f87bd4cacba606b66b3bb28617c9220cfe1c446598906f00fbb50a00f01"
+  },
+  "get_node_status": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/status",
+     []
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "e79817b039132613136ad07bcb9bba1ebb9d8dac56909a04bb3641daa1419159"
+  },
+  "get_node_storage_status": {
+   "args": {
+    "node": "pve1",
+    "storage": "local"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/storage/local/status",
+     []
+    ]
+   ],
+   "module": "storage",
+   "tool_sha256": "042e4a5659c59fb39e412e5f2164f22253055822d358829385bcf0bb84ea7d59"
+  },
+  "get_node_subscription": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/subscription",
+     []
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "3827d121265160607be2764191eec9a6870798c860fe68748aaf4096e3bfb2a4"
+  },
+  "get_node_syslog": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/syslog",
+     []
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "73d0a4cb3d0bba7c13c6fa55c012ada3870ab9eb1ddfbe0ea1d4856fd48ca0e2"
+  },
+  "get_node_time": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/time",
+     []
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "472a2580f0508757139c9be974ea3eaa1207e3f46c4c791eefad0d9bdad6f0a2"
+  },
+  "get_node_version": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/version",
+     []
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "ffabce4fdf775b4c967b8b92c322d62700227b3b0b6e32d35a25d6483eeefc2e"
+  },
+  "get_notification_matcher": {
+   "args": {
+    "name": "name1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/cluster/notifications/matchers/name1",
+     []
+    ]
+   ],
+   "module": "notifications",
+   "tool_sha256": "e240b5ffa3937030b1e49cf18a1efc9b79017dfd183f803efae1516cfd58b04c"
+  },
+  "get_pool": {
+   "args": {
+    "poolid": "pool1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/pools/pool1",
+     []
+    ]
+   ],
+   "module": "pools",
+   "tool_sha256": "475cba116fc3f08e0dc1a6feee01c1b98401378a111406d00f7a8d0cba46bfdb"
+  },
+  "get_replication_job": {
+   "args": {
+    "id": "100-0"
+   },
+   "calls": [
+    [
+     "GET",
+     "/cluster/replication/100-0",
+     []
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "253581820bc7605f11f895a8d0844af3bda661f118227375491946c8256310e3"
+  },
+  "get_role": {
+   "args": {
+    "roleid": "Role1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/access/roles/Role1",
+     []
+    ]
+   ],
+   "module": "access",
+   "tool_sha256": "ba822a609aeb9184e95edfca7be781ad5c3d748e575cdfa2538f5fa9ceaa4a6e"
+  },
+  "get_sdn_vnet": {
+   "args": {
+    "vnet": "vnet1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/cluster/sdn/vnets/vnet1",
+     []
+    ]
+   ],
+   "module": "sdn",
+   "tool_sha256": "eda7c1c00f888ef9ddb89f2e6cc359df3d78c6632312e8c35a494194193a9a3e"
+  },
+  "get_sdn_zone": {
+   "args": {
+    "zone": "zone1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/cluster/sdn/zones/zone1",
+     []
+    ]
+   ],
+   "module": "sdn",
+   "tool_sha256": "99e9a3f31b70a1e94319dc220e3ec2826b982de30832206099b79e976cac2e95"
+  },
+  "get_sendmail_endpoint": {
+   "args": {
+    "name": "name1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/cluster/notifications/endpoints/sendmail/name1",
+     []
+    ]
+   ],
+   "module": "notifications",
+   "tool_sha256": "486a076c7ec944454cf77e582f2ef503999f529e9453a1ea21ff38f9e5580269"
+  },
+  "get_storage_config": {
+   "args": {
+    "storage": "local"
+   },
+   "calls": [
+    [
+     "GET",
+     "/storage/local",
+     []
+    ]
+   ],
+   "module": "storage",
+   "tool_sha256": "0c930787f900bac7aba4005fd6f37d45989be08c810b372e5d8673073c1f25e3"
+  },
+  "get_storage_volume_info": {
+   "args": {
+    "node": "pve1",
+    "storage": "local",
+    "volume": "local:iso/test.iso"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/storage/local/content/local%3Aiso%2Ftest.iso",
+     []
+    ]
+   ],
+   "module": "storage",
+   "tool_sha256": "18a4a77d6d69bfb09a6d2c9ef2acad052417d5a3d6cd761eff005761b73c2413"
+  },
+  "get_task_log": {
+   "args": {
+    "node": "pve1",
+    "upid": "UPID:pve1:0000ABCD:00000001:65000000:qmstart:100:mcp-rw@pve!mcp:"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/tasks/UPID:pve1:0000ABCD:00000001:65000000:qmstart:100:mcp-rw@pve!mcp:/log",
+     []
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "6d3e249043389eff73fd177a5f1f8ad51d7347857549066db04e26ee9c6365f8"
+  },
+  "get_task_status": {
+   "args": {
+    "node": "pve1",
+    "upid": "UPID:pve1:0000ABCD:00000001:65000000:qmstart:100:mcp-rw@pve!mcp:"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/tasks/UPID:pve1:0000ABCD:00000001:65000000:qmstart:100:mcp-rw@pve!mcp:/status",
+     []
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "ea8e3699b379060147001c911ff95fe36b54a4f7ea2747b6830976d083e7effe"
+  },
+  "get_user": {
+   "args": {
+    "userid": "jdoe@pve"
+   },
+   "calls": [
+    [
+     "GET",
+     "/access/users/jdoe@pve",
+     []
+    ]
+   ],
+   "module": "access",
+   "tool_sha256": "937cac08985691b49199e25c0415f5d1ea53a0ac9604df12c741cceb1469fa6e"
+  },
+  "get_user_tfa": {
+   "args": {
+    "userid": "jdoe@pve"
+   },
+   "calls": [
+    [
+     "GET",
+     "/access/tfa/jdoe@pve",
+     []
+    ]
+   ],
+   "module": "access",
+   "tool_sha256": "588faed313e7bbd95e06719a97cb95b42ef6ade7b4ee62629885e96c8f2b1329"
+  },
+  "get_user_token": {
+   "args": {
+    "tokenid": "tok1",
+    "userid": "jdoe@pve"
+   },
+   "calls": [
+    [
+     "GET",
+     "/access/users/jdoe@pve/token/tok1",
+     []
+    ]
+   ],
+   "module": "access",
+   "tool_sha256": "a03adb3e85066c95d3ea843e6a77e365f48829dbd947b80b9823b5d258f59f83"
+  },
+  "get_vm_cloudinit": {
+   "args": {
+    "node": "pve1",
+    "type": "user",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/qemu/100/cloudinit/dump",
+     [
+      [
+       "type",
+       "user"
+      ]
+     ]
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "2f158d96f3674cf79568c54f04baf1aed0f734f01a2d4a62edffe34477c18f41"
+  },
+  "get_vm_config": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/qemu/100/config",
+     []
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "abde73984734e6f7775c045dc58b5ed4ffec93913b3f99ee1a4b57acfd4d28f5"
+  },
+  "get_vm_feature": {
+   "args": {
+    "feature": "snapshot",
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/qemu/100/feature",
+     [
+      [
+       "feature",
+       "snapshot"
+      ]
+     ]
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "2659b6bc1394c959ede3a984a7ffcefa27eed9b6854d6572ab299ee23001e00a"
+  },
+  "get_vm_firewall_log": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/qemu/100/firewall/log",
+     []
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "83749426edcf67e1763a0316ddaeebc56ba17a049eb27dae1f26035a16b787a8"
+  },
+  "get_vm_firewall_options": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/qemu/100/firewall/options",
+     []
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "4941c7a65716a0eca4bf6e467276e0c9484fc7ec097b2baf63b1a9a6fb3ec71e"
+  },
+  "get_vm_firewall_rules": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/qemu/100/firewall/rules",
+     []
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "0713bd894afc410dd052c76ce0c569953134849f6d825bd123931d64c71e6540"
+  },
+  "get_vm_migrate_preconditions": {
+   "args": {
+    "node": "pve1",
+    "target": "pve2",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/qemu/100/migrate",
+     [
+      [
+       "target",
+       "pve2"
+      ]
+     ]
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "4e8c4b89b8c414e81adc5fc1913f63172121d0262bce7b7b2754edaff8f85415"
+  },
+  "get_vm_pending": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/qemu/100/pending",
+     []
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "0ee12af8e314d56720bcc7f3926251c7d272480349da3051546aac5ecfc5ddb1"
+  },
+  "get_vm_rrddata": {
+   "args": {
+    "node": "pve1",
+    "timeframe": "hour",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/qemu/100/rrddata",
+     [
+      [
+       "timeframe",
+       "hour"
+      ]
+     ]
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "942e811d4e2930364400543ea4688253ce85a5e86960b11c68e1c101d9618c1b"
+  },
+  "get_vm_snapshot_config": {
+   "args": {
+    "node": "pve1",
+    "snapname": "snap1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/qemu/100/snapshot/snap1/config",
+     []
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "9c647aab0eb6dc0a17f403f877e4e7ceb292c8f8d63661bc917e73d7f4f4cb44"
+  },
+  "get_vm_spice_proxy": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/qemu/100/spiceproxy",
+     []
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "1756cbb4f6fbc58343c018f6d6e29998f2f440eca2135eced82719995f68b44f"
+  },
+  "get_vm_status": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/qemu/100/status/current",
+     []
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "49cae9c049ad5db8b5b56e71f5a78e4629a66c9923b9b74da316c596fc317867"
+  },
+  "get_vm_vnc_proxy": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/qemu/100/vncproxy",
+     []
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "e9639666ed584d629081528f4fe4c94c47c2ae13567836321b0ce90179a657f1"
+  },
+  "get_zfs_pool": {
+   "args": {
+    "name": "name1",
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/disks/zfs/name1",
+     []
+    ]
+   ],
+   "module": "disks",
+   "tool_sha256": "6cebd5a1be0ffd55bb75bfa3d3d5faa07db47bacab7e03aebc81ae07ff8787ad"
+  },
+  "import_vm_disk": {
+   "args": {
+    "node": "pve1",
+    "source": "local:import/disk.qcow2",
+    "storage": "local",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/qemu/100/config",
+     [
+      [
+       "scsi0",
+       "local:0,import-from=local:import/disk.qcow2"
+      ]
+     ]
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "99f2738371d1d69bb006fd60958c8abccb7b36653cf5667a58a04d9397996922"
+  },
+  "init_disk_gpt": {
+   "args": {
+    "disk": "/dev/sdb",
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/disks/initgpt",
+     [
+      [
+       "disk",
+       "/dev/sdb"
+      ]
+     ]
+    ]
+   ],
+   "module": "disks",
+   "tool_sha256": "dbb9744bfa6de8746cfc9d38d091b61ba4b0ac5fc5412760231d32ff12bdd942"
+  },
+  "list_acme_accounts": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/acme/account",
+     []
+    ]
+   ],
+   "module": "acme",
+   "tool_sha256": "1fbb9893659d3c0d74fa0e4910450372c5aed54f6cbe164395391ee2bac18eed"
+  },
+  "list_acme_challenge_schemas": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/acme/challenge-schema",
+     []
+    ]
+   ],
+   "module": "acme",
+   "tool_sha256": "4091edd4e81b7bfa9bdbd062824ec70701e3092a9e92cd7375f08fb5841ac2fc"
+  },
+  "list_acme_directories": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/acme/directories",
+     []
+    ]
+   ],
+   "module": "acme",
+   "tool_sha256": "4fd7295d545699b398580ca229dc8bd18c2b0ff8a9e38b01988ef6c6cd47a83d"
+  },
+  "list_acme_plugins": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/acme/plugins",
+     []
+    ]
+   ],
+   "module": "acme",
+   "tool_sha256": "5fc73d5c5c67b3a4bb8577b9c4c920acdbd68c774b7c2c5aa25f9acb8acd77e4"
+  },
+  "list_auth_domains": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/access/domains",
+     []
+    ]
+   ],
+   "module": "access",
+   "tool_sha256": "21ce072c42bedf949c8e1e56b4a13611c2c71c5c3cc0fe3abd01368ca4f0906a"
+  },
+  "list_backup_jobs": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/backup",
+     []
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "158db7c99e0316899f87ebd208e5e69074cf3a736b0c9df8e6589c86dd385af3"
+  },
+  "list_ceph_fs": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/ceph/fs",
+     []
+    ]
+   ],
+   "module": "ceph",
+   "tool_sha256": "3d9c17f589fe8bef7ca4db813e2d33594d3cdca73a33c5a48997c1a2ebdbd7f3"
+  },
+  "list_ceph_mds": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/ceph/mds",
+     []
+    ]
+   ],
+   "module": "ceph",
+   "tool_sha256": "c35809cba0bfcdfaf7623d72dd1af63e2e1f6821231d07acd91493e5b88bedbe"
+  },
+  "list_ceph_mgrs": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/ceph/mgr",
+     []
+    ]
+   ],
+   "module": "ceph",
+   "tool_sha256": "dea0f45986dc19d70682daba79d4b4ace38824215e6a65194e8fb50910b42ce5"
+  },
+  "list_ceph_mons": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/ceph/mon",
+     []
+    ]
+   ],
+   "module": "ceph",
+   "tool_sha256": "94d4617d6968ccb1f2ed08d0ef0deee9d34481ec57f78ae66619f1709df9e614"
+  },
+  "list_ceph_osds": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/ceph/osd",
+     []
+    ]
+   ],
+   "module": "ceph",
+   "tool_sha256": "ea49cbc0d7633eaa7fea240248543c2b0e89673f6fcb633cfd979d2597999282"
+  },
+  "list_ceph_pools": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/ceph/pool",
+     []
+    ]
+   ],
+   "module": "ceph",
+   "tool_sha256": "ce46750c0a65e688e4a946d15920452c28840b0c4b82d76c25dddb33ec14deec"
+  },
+  "list_cluster_firewall_rules": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/firewall/rules",
+     []
+    ]
+   ],
+   "module": "firewall",
+   "tool_sha256": "9c2c367b14d919341b4223ff6e37c8d23ef7f5c1451fb67e69ed0ff2aa352250"
+  },
+  "list_cluster_tasks": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/tasks",
+     []
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "03b7f8d426ca6ea7e2925cf7cdd7b640f778bf52d5d40bcf8c4ddacf7107255a"
+  },
+  "list_container_snapshots": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/lxc/100/snapshot",
+     []
+    ]
+   ],
+   "module": "lxc",
+   "tool_sha256": "edfbe98d3976d81fd2e3c9fae5aa83a296b7b3f1dfd5d61506aaa54ea6299a83"
+  },
+  "list_containers": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/lxc",
+     []
+    ]
+   ],
+   "module": "lxc",
+   "tool_sha256": "78d5428767a070140d3a7dd0a3b84c757b1867c0c6d50407ebc652b7855c03f7"
+  },
+  "list_directory_storage": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/disks/directory",
+     []
+    ]
+   ],
+   "module": "disks",
+   "tool_sha256": "c22c2d9f8a11bfc66f6979d656ff4091a7cd1897851799bae6c1424b32823cc8"
+  },
+  "list_firewall_aliases": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/firewall/aliases",
+     []
+    ]
+   ],
+   "module": "firewall",
+   "tool_sha256": "8fbb454c0d828e2cd3d4af9fefd7423076a5d4328129da4b7462c7b8466a3c76"
+  },
+  "list_firewall_group_rules": {
+   "args": {
+    "group": "grp1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/cluster/firewall/groups/grp1",
+     []
+    ]
+   ],
+   "module": "firewall",
+   "tool_sha256": "9e6986faed06b044c18f262ba6a0aa15bf7cad8ec953474ca4de032e0dc04bc5"
+  },
+  "list_firewall_groups": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/firewall/groups",
+     []
+    ]
+   ],
+   "module": "firewall",
+   "tool_sha256": "2fdfe84fd9d05911f75b4fc317e7cc12fa21a96f4172d31986a994d239232030"
+  },
+  "list_firewall_ipset_entries": {
+   "args": {
+    "name": "name1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/cluster/firewall/ipset/name1",
+     []
+    ]
+   ],
+   "module": "firewall",
+   "tool_sha256": "3746be36e857d29a1eb45d5ab9510982657fb0515553073a476d1dc3138ef882"
+  },
+  "list_firewall_ipsets": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/firewall/ipset",
+     []
+    ]
+   ],
+   "module": "firewall",
+   "tool_sha256": "a56669f7ebfb0f1496042e2b0f44f79662add80d61d08f21353f6083c43df921"
+  },
+  "list_firewall_macros": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/firewall/macros",
+     []
+    ]
+   ],
+   "module": "firewall",
+   "tool_sha256": "524a3df3da52eda1f82a9806d02ba5cff54479b0873a67dc72962074fd5cef6c"
+  },
+  "list_firewall_refs": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/firewall/refs",
+     []
+    ]
+   ],
+   "module": "firewall",
+   "tool_sha256": "9faf5cba7498595d80413ed7c0f6b1ca361ad7a0a401d8c940475354b906e4f5"
+  },
+  "list_gotify_endpoints": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/notifications/endpoints/gotify",
+     []
+    ]
+   ],
+   "module": "notifications",
+   "tool_sha256": "d6fec23e8c7c78c5b50f225c5259380f5e8ce286d98d6c99afa0c5341aebd488"
+  },
+  "list_groups": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/access/groups",
+     []
+    ]
+   ],
+   "module": "access",
+   "tool_sha256": "530d95b1895bc7e3e3c26829d61a58394cb003a13cea701983585671a8cd841c"
+  },
+  "list_ha_groups": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/ha/groups",
+     []
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "a619e25a1b752b3e19cadd60b69fce95010fc609c48fa1f08da2c89f208914f9"
+  },
+  "list_ha_resources": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/ha/resources",
+     []
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "19cfb71abab65c204a144b5edefc51f5aeb1c10cb406a7c2190b5e39a324bd0a"
+  },
+  "list_lvm_groups": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/disks/lvm",
+     []
+    ]
+   ],
+   "module": "disks",
+   "tool_sha256": "77dc196b101e27c4598017b7769961c30d9f537167150c3c258e9638f2ae10a4"
+  },
+  "list_lvmthin_pools": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/disks/lvmthin",
+     []
+    ]
+   ],
+   "module": "disks",
+   "tool_sha256": "0991cac9c8b18ba4022f5b0acb1c0ee9de1ce23eb432b57f9fb7f940eb43eca5"
+  },
+  "list_metrics_servers": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/metrics/server",
+     []
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "cff8eb5b3c2d0858cde21b61fb016cfef79246ca65585aacd5d9507ba08a09b6"
+  },
+  "list_node_disks": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/disks/list",
+     []
+    ]
+   ],
+   "module": "disks",
+   "tool_sha256": "366743788b13485229d364bd3d0370f684a93928caf50ffe126f721c8d279d1f"
+  },
+  "list_node_firewall_rules": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/firewall/rules",
+     []
+    ]
+   ],
+   "module": "firewall",
+   "tool_sha256": "4c604290ee19dbf7cb30715cddc12a6afcb14fcdcbb1dc0c36df0db654d17127"
+  },
+  "list_node_sdn_vnets": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/sdn/vnets",
+     []
+    ]
+   ],
+   "module": "sdn",
+   "tool_sha256": "e01abbc55639fadcb0b84dfeea48bfb9c93248758e67b4c344af20e7b6c51ab1"
+  },
+  "list_node_sdn_zones": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/sdn/zones",
+     []
+    ]
+   ],
+   "module": "sdn",
+   "tool_sha256": "60030c20f23b8b10b5c26b306d80db00f16a8b20aeab5616ab4139f2c8365681"
+  },
+  "list_node_services": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/services",
+     []
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "2514161583c30405e144465c3d831f4c6f99a2d6a1731491873966b754fde694"
+  },
+  "list_node_tasks": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/tasks",
+     []
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "388dccfe129bd87f0d389be5bc59599d32551313e01d3e451a8e29cbdb49e0bb"
+  },
+  "list_nodes": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/nodes",
+     []
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "2de16e4f72d901026d5d345843961b4141d8af8f8d855ecfa8ea2a824d7b0412"
+  },
+  "list_notification_matcher_fields": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/notifications/matcher-fields",
+     []
+    ]
+   ],
+   "module": "notifications",
+   "tool_sha256": "555a7e71ec0b34b5605ac2df5381c0c062c273f5c4ba4a49673102e1e2730d02"
+  },
+  "list_notification_matchers": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/notifications/matchers",
+     []
+    ]
+   ],
+   "module": "notifications",
+   "tool_sha256": "cc41fe037ba755aa5adf59f9c3a05bbd4e7941389f178bf2d6973a5df2ac7f11"
+  },
+  "list_notification_targets": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/notifications/targets",
+     []
+    ]
+   ],
+   "module": "notifications",
+   "tool_sha256": "3ebd1cffa32cd163290e36a0ff2b2dfc1ff3ba227c30b344dbf307bcb3777a4c"
+  },
+  "list_pools": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/pools",
+     []
+    ]
+   ],
+   "module": "pools",
+   "tool_sha256": "d71093947464cbdb907c235025754eecfa99c4c17185c39d809dc2889fcc2ef2"
+  },
+  "list_realm_sync_jobs": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/jobs/realm-sync",
+     []
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "686ac1906f780a04c134c873443825a8fa501d20986a45af6ac6d02887a94d1f"
+  },
+  "list_replication_jobs": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/replication",
+     []
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "67ac0d8f321485c019e600984b4175a7330be41c42dd60fb9e84fbefe9a553db"
+  },
+  "list_roles": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/access/roles",
+     []
+    ]
+   ],
+   "module": "access",
+   "tool_sha256": "dc071f0bf46cca94541d1b4d0cd33932ff4ac0a72398785da25acf4a11c8e771"
+  },
+  "list_sdn_subnets": {
+   "args": {
+    "vnet": "vnet1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/cluster/sdn/vnets/vnet1/subnets",
+     []
+    ]
+   ],
+   "module": "sdn",
+   "tool_sha256": "75f9d22eed4523d5b0b906b6a14bf9327ea4876a071d89bafef5be9e0c244ebe"
+  },
+  "list_sdn_vnets": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/sdn/vnets",
+     []
+    ]
+   ],
+   "module": "sdn",
+   "tool_sha256": "3cbed6daf9fc2ab0277e833a189d68d3b822aaf19dddf48994fb899794c2f247"
+  },
+  "list_sdn_zones": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/sdn/zones",
+     []
+    ]
+   ],
+   "module": "sdn",
+   "tool_sha256": "38c610488cb79f06e45b3e7a35f0b8bad72c6fd21606ee7f142f238eaf634f11"
+  },
+  "list_sendmail_endpoints": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/notifications/endpoints/sendmail",
+     []
+    ]
+   ],
+   "module": "notifications",
+   "tool_sha256": "3e83b61caf038540ea513e676a617721ed254c7fc9130288d771a59a07b60b42"
+  },
+  "list_smtp_endpoints": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/notifications/endpoints/smtp",
+     []
+    ]
+   ],
+   "module": "notifications",
+   "tool_sha256": "8082048f813902400ed16362f0d3fcc2475761c1015fca5792df7cf69a6f7fad"
+  },
+  "list_storage": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/storage",
+     []
+    ]
+   ],
+   "module": "storage",
+   "tool_sha256": "bb8d6f45569dc736175ba5a4d149cb0fbbea52a7e62f969b7d7f229fcb2da230"
+  },
+  "list_storage_content": {
+   "args": {
+    "node": "pve1",
+    "storage": "local"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/storage/local/content",
+     []
+    ]
+   ],
+   "module": "storage",
+   "tool_sha256": "8615ef4b57fc4f541a0d2045255681ae8f43b95cfcdc492cbc60c7ccb03b4954"
+  },
+  "list_tfa": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/access/tfa",
+     []
+    ]
+   ],
+   "module": "access",
+   "tool_sha256": "9c0f9fb8d4007ec899eaed27b0b8b1b552aed7d723068096d4c9bf11d7a390dd"
+  },
+  "list_user_tokens": {
+   "args": {
+    "userid": "jdoe@pve"
+   },
+   "calls": [
+    [
+     "GET",
+     "/access/users/jdoe@pve/token",
+     []
+    ]
+   ],
+   "module": "access",
+   "tool_sha256": "b45236b17a7c40cefd4ed58244f255c97501252394575b419771897edd324e88"
+  },
+  "list_users": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/access/users",
+     []
+    ]
+   ],
+   "module": "access",
+   "tool_sha256": "8af8215cff03c5b8584e7fa935a1cd9fb53ff64b36774e9e1e7b3191cb1ffe72"
+  },
+  "list_vm_snapshots": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/qemu/100/snapshot",
+     []
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "03761f5f7c02822bfb9d9372f2fdfce1f6760aa7cb9d9653e3c2a737cecbfd55"
+  },
+  "list_vms": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/nodes",
+     []
+    ],
+    [
+     "GET",
+     "/nodes/pve1/qemu",
+     []
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "1f73e1b2a7117e772097a3c55828b6791b317f96975915ba8f3792374a34ac5b"
+  },
+  "list_webhook_endpoints": {
+   "args": {},
+   "calls": [
+    [
+     "GET",
+     "/cluster/notifications/endpoints/webhook",
+     []
+    ]
+   ],
+   "module": "notifications",
+   "tool_sha256": "876804869f2878ed516a05ab6f064994b76fc8e95988314ab04b14c7fb893258"
+  },
+  "list_zfs_pools": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/disks/zfs",
+     []
+    ]
+   ],
+   "module": "disks",
+   "tool_sha256": "3e422ccb68f7f2f84415f40aa20a345ae728125219fa12562f0a45b9502c708e"
+  },
+  "migrate_container": {
+   "args": {
+    "node": "pve1",
+    "target": "pve2",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/lxc/100/migrate",
+     [
+      [
+       "target",
+       "pve2"
+      ]
+     ]
+    ]
+   ],
+   "module": "lxc",
+   "tool_sha256": "08a24ad72330d7a98b59d9970906a375ee3aaf84601e79012d615cf7610d26de"
+  },
+  "migrate_vm": {
+   "args": {
+    "node": "pve1",
+    "target": "pve2",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/qemu/100/migrate",
+     [
+      [
+       "target",
+       "pve2"
+      ]
+     ]
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "a125364ae22b0bd6d33a04732cec45a5d66e4cce11a0843fa6f1a1dab9528af3"
+  },
+  "move_container_disk": {
+   "args": {
+    "disk": "rootfs",
+    "node": "pve1",
+    "storage": "local",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/lxc/100/move_volume",
+     [
+      [
+       "disk",
+       "rootfs"
+      ],
+      [
+       "storage",
+       "local"
+      ]
+     ]
+    ]
+   ],
+   "module": "lxc",
+   "tool_sha256": "35ece03ad253b500d69234821f4a734dd91c6dbdc8704616e1e83754430750e4"
+  },
+  "move_vm_disk": {
+   "args": {
+    "disk": "scsi0",
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/qemu/100/move_disk",
+     [
+      [
+       "disk",
+       "scsi0"
+      ]
+     ]
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "27cc99cbf0a0be8cbfc8318abe2f0a04573783d040d70f6635e886a01e77dab5"
+  },
+  "node_migrateall": {
+   "args": {
+    "node": "pve1",
+    "target": "pve2"
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/migrateall",
+     [
+      [
+       "target",
+       "pve2"
+      ]
+     ]
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "ec791b5d8ae212aeb9bf9b8d02395bb9475ac38f85b04b2fe3ae30ab480ba19b"
+  },
+  "node_shutdown": {
+   "args": {
+    "command": "shutdown",
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/status",
+     [
+      [
+       "command",
+       "shutdown"
+      ]
+     ]
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "fa5658e4b17b8ba79bcdf7512444b8ebe60734264ba937f6df70c6454a00bd73"
+  },
+  "node_startall": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/startall",
+     []
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "6b09b04f872e7b0cfae69be54e40ad3b4cc4c77240faf05393dec086c57626cb"
+  },
+  "node_stopall": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/stopall",
+     []
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "c2f0dc100f7e29c8734836738c68617087c94af3ab2949bd58c47453fd7a8cff"
+  },
+  "order_node_acme_cert": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/certificates/acme/certificate",
+     []
+    ]
+   ],
+   "module": "acme",
+   "tool_sha256": "382b57e63c1da90cdbc40e1e433f754128e57c84a7b275c0bce64d3de9f1cf45"
+  },
+  "reboot_container": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/lxc/100/status/reboot",
+     []
+    ]
+   ],
+   "module": "lxc",
+   "tool_sha256": "5da4c0bd1b4fbff640ae63d2c53a8a9914a5ad5aa3e3d9f161c8f63de8c7b1e6"
+  },
+  "reboot_vm": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/qemu/100/status/reboot",
+     []
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "25bb391610831a9c01c3210bdecdc3199a90f9abe0c6bdc2084082a1fbec582e"
+  },
+  "regenerate_vm_cloudinit": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "PUT",
+     "/nodes/pve1/qemu/100/cloudinit",
+     []
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "2dd905685859106a70193c4cf41eadd4accdde961165f7188ecda1e9d6504f6a"
+  },
+  "register_acme_account": {
+   "args": {
+    "contact": "ops@example.com"
+   },
+   "calls": [
+    [
+     "POST",
+     "/cluster/acme/account",
+     [
+      [
+       "contact",
+       "ops@example.com"
+      ]
+     ]
+    ]
+   ],
+   "module": "acme",
+   "tool_sha256": "7b97ca32e6b11ae929cf8ad748407ae32298248884fbdd5118e53e7111d2d771"
+  },
+  "reload_node_service": {
+   "args": {
+    "node": "pve1",
+    "service": "pveproxy"
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/services/pveproxy/reload",
+     []
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "f9a8a8f7a2932e97c14027f16220b8f1c758562b11fa953928583486ff3988f9"
+  },
+  "reset_vm": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/qemu/100/status/reset",
+     []
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "d62177ad7ad86ef5137897515732fb7fd011e7126d6af2021dd2861318d8bfbd"
+  },
+  "resize_container_disk": {
+   "args": {
+    "disk": "rootfs",
+    "node": "pve1",
+    "size": "+1G",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "PUT",
+     "/nodes/pve1/lxc/100/resize",
+     [
+      [
+       "disk",
+       "rootfs"
+      ],
+      [
+       "size",
+       "+1G"
+      ]
+     ]
+    ]
+   ],
+   "module": "lxc",
+   "tool_sha256": "e36d7af5fad25fca1dde07f5cd1c5f2afb0d4a8438d5055df3bc60a7c6ea6c4e"
+  },
+  "resize_vm_disk": {
+   "args": {
+    "disk": "scsi0",
+    "node": "pve1",
+    "size": "+1G",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "PUT",
+     "/nodes/pve1/qemu/100/resize",
+     [
+      [
+       "disk",
+       "scsi0"
+      ],
+      [
+       "size",
+       "+1G"
+      ]
+     ]
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "41664de90595960b7ab1a5eab75c488a59cd48a4a771336838027629bda08c6d"
+  },
+  "restart_ceph": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/ceph/restart",
+     []
+    ]
+   ],
+   "module": "ceph",
+   "tool_sha256": "4b8cf010d25254992b7e0651578bf128fe1bfb2fbb05388b0ccf88450b2365bd"
+  },
+  "restart_node_service": {
+   "args": {
+    "node": "pve1",
+    "service": "pveproxy"
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/services/pveproxy/restart",
+     []
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "325091a56faba95e9fc3534cdf1b65fe8d96a62380c2fbf83be60e16c1c5cfde"
+  },
+  "restore_container_backup": {
+   "args": {
+    "node": "pve1",
+    "ostemplate": "local:vztmpl/debian-12-standard_12.7-1_amd64.tar.zst",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/lxc",
+     [
+      [
+       "ostemplate",
+       "local:vztmpl/debian-12-standard_12.7-1_amd64.tar.zst"
+      ],
+      [
+       "vmid",
+       "100"
+      ]
+     ]
+    ]
+   ],
+   "module": "storage",
+   "tool_sha256": "1d62b740c01639cc3d3092353613d5b163714fc523bc1e25715b2a4d71f1868e"
+  },
+  "restore_vm_backup": {
+   "args": {
+    "archive": "local:backup/vzdump-qemu-100.vma.zst",
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/qemu",
+     [
+      [
+       "archive",
+       "local:backup/vzdump-qemu-100.vma.zst"
+      ],
+      [
+       "vmid",
+       "100"
+      ]
+     ]
+    ]
+   ],
+   "module": "storage",
+   "tool_sha256": "6cbe262a674d55fe5f391dfcda0b426731b5ca952fa32b09fadd1aff097dfdf9"
+  },
+  "resume_container": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/lxc/100/status/resume",
+     []
+    ]
+   ],
+   "module": "lxc",
+   "tool_sha256": "a8c0665d556ecb21cbe951592c626518862e5a3c66151abe99fa8e9b4e598147"
+  },
+  "resume_vm": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/qemu/100/status/resume",
+     []
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "5cc6eb54d304b4ec42f8b968402c3a744ae4209c3bc1bf91d9c16985e771605d"
+  },
+  "revert_node_network": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/nodes/pve1/network",
+     []
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "326c31a652c8c0ad506eab4a5046cc11f88c44339c2bea96953b3ac75079fc1a"
+  },
+  "revoke_node_acme_cert": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/nodes/pve1/certificates/acme/certificate",
+     []
+    ]
+   ],
+   "module": "acme",
+   "tool_sha256": "e22c0adafd1847e7398f45cc5f38dd3a12934e260ab72cef0bf264f0524e9084"
+  },
+  "rollback_container_snapshot": {
+   "args": {
+    "node": "pve1",
+    "snapname": "snap1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/lxc/100/snapshot/snap1/rollback",
+     []
+    ]
+   ],
+   "module": "lxc",
+   "tool_sha256": "1a23bd1e3e3dc80d9ad20dc4a9cc3ee6ed14818a96a9d681b39de3c08810be1c"
+  },
+  "rollback_vm_snapshot": {
+   "args": {
+    "node": "pve1",
+    "snapname": "snap1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/qemu/100/snapshot/snap1/rollback",
+     []
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "687a6ccd46fa204fe9cdc18a4e45e2cd579a9b75277bcd43c1b4bacfdf813585"
+  },
+  "set_ceph_osd_in": {
+   "args": {
+    "node": "pve1",
+    "osdid": 0
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/ceph/osd/0/in",
+     []
+    ]
+   ],
+   "module": "ceph",
+   "tool_sha256": "6ad04140ffc299e3822d9ef2fa67ab7e4ed768266fcf32963772d73308ccfe62"
+  },
+  "set_ceph_osd_out": {
+   "args": {
+    "node": "pve1",
+    "osdid": 0
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/ceph/osd/0/out",
+     []
+    ]
+   ],
+   "module": "ceph",
+   "tool_sha256": "6487330154b612928f693260c362ddb9bee496230cc55961885e8b1cdcfb67fb"
+  },
+  "set_cluster_ceph_flags": {
+   "args": {},
+   "calls": [
+    [
+     "PUT",
+     "/cluster/ceph/flags",
+     []
+    ]
+   ],
+   "module": "ceph",
+   "tool_sha256": "f6bb19fe1fbcd2d8688cd48d0af757e1ad5ea5e58bcb2de7e617ed17b91343f9"
+  },
+  "set_cluster_firewall_options": {
+   "args": {},
+   "calls": [
+    [
+     "PUT",
+     "/cluster/firewall/options",
+     []
+    ]
+   ],
+   "module": "firewall",
+   "tool_sha256": "c6c1dd6c4f28811b388b4c8c1bcea8689770162926a51469755cc53b6d6df456"
+  },
+  "set_cluster_options": {
+   "args": {},
+   "calls": [
+    [
+     "PUT",
+     "/cluster/options",
+     []
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "34c46988a88f69dea638b6c59285584a316dee2bb5b79046b46b5ae82f39bed9"
+  },
+  "set_container_config": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "PUT",
+     "/nodes/pve1/lxc/100/config",
+     []
+    ]
+   ],
+   "module": "lxc",
+   "tool_sha256": "d03e4731556e8cc5dafffb853fea2c3fa0c854c71088fd134dec4164a4de8378"
+  },
+  "set_container_firewall_options": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "PUT",
+     "/nodes/pve1/lxc/100/firewall/options",
+     []
+    ]
+   ],
+   "module": "lxc",
+   "tool_sha256": "5644553b86520330ef51345102a8554db84da4b2aedb166c3bcaf72f105badb3"
+  },
+  "set_node_dns": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "PUT",
+     "/nodes/pve1/dns",
+     []
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "30827d6b431d4baceb58ae6ab8a72ad77f2105ca202ba185a9db694008516b8b"
+  },
+  "set_node_firewall_options": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "PUT",
+     "/nodes/pve1/firewall/options",
+     []
+    ]
+   ],
+   "module": "firewall",
+   "tool_sha256": "a346288081ce695d192f880e0d47ef2b8d9c6fd1d5cfdd78e031290e36a16953"
+  },
+  "set_node_hosts": {
+   "args": {
+    "data": "127.0.0.1 localhost",
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/hosts",
+     [
+      [
+       "data",
+       "127.0.0.1 localhost"
+      ]
+     ]
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "097beeeccd8443ee8e9d05f6be8d4d48c9eadbd6976dc800eda5740d90f336d9"
+  },
+  "set_node_time": {
+   "args": {
+    "node": "pve1",
+    "timezone": "UTC"
+   },
+   "calls": [
+    [
+     "PUT",
+     "/nodes/pve1/time",
+     [
+      [
+       "timezone",
+       "UTC"
+      ]
+     ]
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "4af8c7e10740a1d4ebd00d1de7623632da8f2d77e459a687b0d63334d08a8fb1"
+  },
+  "set_vm_config": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "PUT",
+     "/nodes/pve1/qemu/100/config",
+     []
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "788b9bb67faea16c889e4a4139f80dc77d3ea6fb25fad2e107f24af650374188"
+  },
+  "set_vm_firewall_options": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "PUT",
+     "/nodes/pve1/qemu/100/firewall/options",
+     []
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "0e0d6bc2920b8ec09fea6c20aa60f238e9f0e8f6e4b37a6ab98141c60a65f7cb"
+  },
+  "shutdown_container": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/lxc/100/status/shutdown",
+     []
+    ]
+   ],
+   "module": "lxc",
+   "tool_sha256": "78fb97f8fb57bce4659fe35c67637feed7c36a0f75564dc08b030681bd4fd03b"
+  },
+  "shutdown_vm": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/qemu/100/status/shutdown",
+     []
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "d7a9320c3d56b47f49a1ba051d6a113cf48d3f30374d98d4db2e3da02c287e50"
+  },
+  "start_ceph": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/ceph/start",
+     []
+    ]
+   ],
+   "module": "ceph",
+   "tool_sha256": "6230e0a51d0887bbe5ae8addf704d003d25463d76c52467d742f07fa5bb8be16"
+  },
+  "start_container": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/lxc/100/status/start",
+     []
+    ]
+   ],
+   "module": "lxc",
+   "tool_sha256": "52095f8de5bba634a1599a3477d2c0390b54c6f02cf92defa86dc8be8c84876e"
+  },
+  "start_node_service": {
+   "args": {
+    "node": "pve1",
+    "service": "pveproxy"
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/services/pveproxy/start",
+     []
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "c05ddd92e46918083262eb398f3d702232f283f9e2eff78277e77b1b2cc8669d"
+  },
+  "start_vm": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/qemu/100/status/start",
+     []
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "cce4aa69a852c52e8322ace86ef07fbaeecb47b860e426e5452b4e9935ccaaca"
+  },
+  "stop_ceph": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/ceph/stop",
+     []
+    ]
+   ],
+   "module": "ceph",
+   "tool_sha256": "f873949a51fe77fe1e60f8dd512d8671af11c08d0bd4651f1aadf61847f8bb81"
+  },
+  "stop_container": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/lxc/100/status/stop",
+     []
+    ]
+   ],
+   "module": "lxc",
+   "tool_sha256": "84c9b339c4c03fdbb7b59732a8498399c809cc4a616641b825e665873e6b9e43"
+  },
+  "stop_node_service": {
+   "args": {
+    "node": "pve1",
+    "service": "pveproxy"
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/services/pveproxy/stop",
+     []
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "5bfe93db54984d746011e5f52a40da054bb249eee9c3d37208a1957fc48514f4"
+  },
+  "stop_task": {
+   "args": {
+    "node": "pve1",
+    "upid": "UPID:pve1:0000ABCD:00000001:65000000:qmstart:100:mcp-rw@pve!mcp:"
+   },
+   "calls": [
+    [
+     "DELETE",
+     "/nodes/pve1/tasks/UPID:pve1:0000ABCD:00000001:65000000:qmstart:100:mcp-rw@pve!mcp:",
+     []
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "a32b1311481cba9eb036aed4f336d84ca7bbe6efe7a919e56dffc23e987ec5f3"
+  },
+  "stop_vm": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/qemu/100/status/stop",
+     []
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "32ee417b3585465aed6c169d3de4c225708d6f194c6aecc83ee51d86aaa2d151"
+  },
+  "suspend_container": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/lxc/100/status/suspend",
+     []
+    ]
+   ],
+   "module": "lxc",
+   "tool_sha256": "adeb9b97fe40f908a77794d007e37fe5c058ec4bda30f1ed26f09305a57cf5b6"
+  },
+  "suspend_vm": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/qemu/100/status/suspend",
+     []
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "25eeb3371f4f690a91a8ad3e856fa488c4415a39697d99728da007fe2b4820e1"
+  },
+  "sync_auth_domain": {
+   "args": {
+    "realm": "corp"
+   },
+   "calls": [
+    [
+     "POST",
+     "/access/domains/corp/sync",
+     []
+    ]
+   ],
+   "module": "access",
+   "tool_sha256": "89a987ecafd2885a3d2f613e4c211672d35c9b8240b70fc3cf08ecc4e4b74af7"
+  },
+  "unlink_vm_disk": {
+   "args": {
+    "idlist": "scsi1",
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "PUT",
+     "/nodes/pve1/qemu/100/unlink",
+     [
+      [
+       "idlist",
+       "scsi1"
+      ]
+     ]
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "4d75579190e8a8bc70af677330764974683e22ef605d981d25322c2bee636249"
+  },
+  "update_acl": {
+   "args": {
+    "path": "/vms/100",
+    "roles": "PVEAuditor"
+   },
+   "calls": [
+    [
+     "PUT",
+     "/access/acl",
+     [
+      [
+       "path",
+       "/vms/100"
+      ],
+      [
+       "roles",
+       "PVEAuditor"
+      ]
+     ]
+    ]
+   ],
+   "module": "access",
+   "tool_sha256": "31aaafeccbb7fbcdd8542314ea77195fb5140c486bc160497712535cccf2e182"
+  },
+  "update_acme_plugin": {
+   "args": {
+    "id": "job1"
+   },
+   "calls": [
+    [
+     "PUT",
+     "/cluster/acme/plugins/job1",
+     []
+    ]
+   ],
+   "module": "acme",
+   "tool_sha256": "914db4f93d07b7edf491ef4d6911f784d33b401e9d8bdd41f5875219061893f5"
+  },
+  "update_auth_domain": {
+   "args": {
+    "realm": "corp"
+   },
+   "calls": [
+    [
+     "PUT",
+     "/access/domains/corp",
+     []
+    ]
+   ],
+   "module": "access",
+   "tool_sha256": "c097521986f102c74b899f9f516957a268b6e072fe9ac654cd5847ddf9fef3a4"
+  },
+  "update_backup_job": {
+   "args": {
+    "id": "job1"
+   },
+   "calls": [
+    [
+     "PUT",
+     "/cluster/backup/job1",
+     []
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "e712620b3d7b74e6a7a11d854985950ebf85b120e13a5cbe706df0b8b2048b42"
+  },
+  "update_ceph_pool": {
+   "args": {
+    "name": "name1",
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "PUT",
+     "/nodes/pve1/ceph/pool/name1",
+     []
+    ]
+   ],
+   "module": "ceph",
+   "tool_sha256": "46a0604b89452c73696624ea1aa45b0869fbdf3f88ea179a903d8f9a7cbf603c"
+  },
+  "update_cluster_firewall_rule": {
+   "args": {
+    "pos": 0
+   },
+   "calls": [
+    [
+     "PUT",
+     "/cluster/firewall/rules/0",
+     []
+    ]
+   ],
+   "module": "firewall",
+   "tool_sha256": "007afda45ee0cab682fd5760a912cf89f141122b02fb646c78c64868981d53a4"
+  },
+  "update_firewall_alias": {
+   "args": {
+    "name": "name1"
+   },
+   "calls": [
+    [
+     "PUT",
+     "/cluster/firewall/aliases/name1",
+     []
+    ]
+   ],
+   "module": "firewall",
+   "tool_sha256": "26fa3982e933cfefedc8046d5fca2a99bbbb64d68a23872dd88b04b73f32c8a1"
+  },
+  "update_gotify_endpoint": {
+   "args": {
+    "name": "name1"
+   },
+   "calls": [
+    [
+     "PUT",
+     "/cluster/notifications/endpoints/gotify/name1",
+     []
+    ]
+   ],
+   "module": "notifications",
+   "tool_sha256": "cd7b3d320e86133729bf4aa09052d5df0b3565b2e8ee663d43028da3ee1bfe64"
+  },
+  "update_group": {
+   "args": {
+    "groupid": "grp1"
+   },
+   "calls": [
+    [
+     "PUT",
+     "/access/groups/grp1",
+     []
+    ]
+   ],
+   "module": "access",
+   "tool_sha256": "d1e20b3d848723f92e19e82c78a244d5bdbc16cc239a483823839a6388eff91b"
+  },
+  "update_ha_resource": {
+   "args": {
+    "sid": "vm:100"
+   },
+   "calls": [
+    [
+     "PUT",
+     "/cluster/ha/resources/vm:100",
+     []
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "e97d6602ba2be5fe07fdbc34b86a2b6587a2fd6d7cdbae2d044bb6d3624ad7a9"
+  },
+  "update_notification_matcher": {
+   "args": {
+    "name": "name1"
+   },
+   "calls": [
+    [
+     "PUT",
+     "/cluster/notifications/matchers/name1",
+     []
+    ]
+   ],
+   "module": "notifications",
+   "tool_sha256": "38a55c4d9772b213cc9e0ce7aed9701ce58d417f02405a4f892e96504f2b6933"
+  },
+  "update_pool": {
+   "args": {
+    "poolid": "pool1"
+   },
+   "calls": [
+    [
+     "PUT",
+     "/pools/pool1",
+     []
+    ]
+   ],
+   "module": "pools",
+   "tool_sha256": "075f3d3bc50cf17173c07bd7c3553bb341384f1c0c866cc4f5318f1cb197534d"
+  },
+  "update_replication_job": {
+   "args": {
+    "id": "100-0"
+   },
+   "calls": [
+    [
+     "PUT",
+     "/cluster/replication/100-0",
+     []
+    ]
+   ],
+   "module": "cluster",
+   "tool_sha256": "534b589b9a527ab2909eb74bf95d7e3a28d64cfa3d95ac4dd3a9594372d7e603"
+  },
+  "update_role": {
+   "args": {
+    "roleid": "Role1"
+   },
+   "calls": [
+    [
+     "PUT",
+     "/access/roles/Role1",
+     []
+    ]
+   ],
+   "module": "access",
+   "tool_sha256": "f81ded426eb78893db4271babfc26a35c36763ab44b3c99b06f77165f098f212"
+  },
+  "update_sdn_vnet": {
+   "args": {
+    "vnet": "vnet1"
+   },
+   "calls": [
+    [
+     "PUT",
+     "/cluster/sdn/vnets/vnet1",
+     []
+    ]
+   ],
+   "module": "sdn",
+   "tool_sha256": "4226d5d1c4c7b807d0e72c206b7e34a9635a78f47c0feb7025cfe490313caa33"
+  },
+  "update_sdn_zone": {
+   "args": {
+    "zone": "zone1"
+   },
+   "calls": [
+    [
+     "PUT",
+     "/cluster/sdn/zones/zone1",
+     []
+    ]
+   ],
+   "module": "sdn",
+   "tool_sha256": "e6d3df6ae083bd774dfa6207744e4991d5ed5b7856fa297a8758f0737cd52784"
+  },
+  "update_sendmail_endpoint": {
+   "args": {
+    "name": "name1"
+   },
+   "calls": [
+    [
+     "PUT",
+     "/cluster/notifications/endpoints/sendmail/name1",
+     []
+    ]
+   ],
+   "module": "notifications",
+   "tool_sha256": "e7fa90ea88c57ec3071882a400de3ab447732f855d43510c598e83d37161a484"
+  },
+  "update_storage": {
+   "args": {
+    "storage": "local"
+   },
+   "calls": [
+    [
+     "PUT",
+     "/storage/local",
+     []
+    ]
+   ],
+   "module": "storage",
+   "tool_sha256": "f3a35b0395d1f8bee816d662c3077f7ac38a1b4ade35fb7e9494b8cd0ec9eb9a"
+  },
+  "update_user": {
+   "args": {
+    "userid": "jdoe@pve"
+   },
+   "calls": [
+    [
+     "PUT",
+     "/access/users/jdoe@pve",
+     []
+    ]
+   ],
+   "module": "access",
+   "tool_sha256": "0c8892a8df938e7f3257671f23dc73828cd0d70ad6c15fda8df44ba6e712ec69"
+  },
+  "update_user_token": {
+   "args": {
+    "tokenid": "tok1",
+    "userid": "jdoe@pve"
+   },
+   "calls": [
+    [
+     "PUT",
+     "/access/users/jdoe@pve/token/tok1",
+     []
+    ]
+   ],
+   "module": "access",
+   "tool_sha256": "4304992e0e7098ba5e458712b89e5c94da7eaa2c33efb284ede041ae006eafb0"
+  },
+  "upload_node_custom_cert": {
+   "args": {
+    "certificates": "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----",
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/certificates/custom",
+     [
+      [
+       "certificates",
+       "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----"
+      ]
+     ]
+    ]
+   ],
+   "module": "acme",
+   "tool_sha256": "83317d4bf8d0325ad4d77cb570db992dd1c34f6fbbcdc0775c5145d8fe183034"
+  },
+  "vm_agent_exec": {
+   "args": {
+    "command": "ls",
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/qemu/100/agent/exec",
+     [
+      [
+       "command",
+       "ls"
+      ]
+     ]
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "a3ad433d267b5d932fb1210f9acae59730c33a10ddc50d12c4bfe5d382db758f"
+  },
+  "vm_agent_exec_status": {
+   "args": {
+    "node": "pve1",
+    "pid": 1,
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/qemu/100/agent/exec-status",
+     [
+      [
+       "pid",
+       "1"
+      ]
+     ]
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "63e4c88dd19dcb90d13441f14e5c4031143ffbeb9332b4e4e04062d8fb9ed8df"
+  },
+  "vm_agent_get_fsinfo": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/qemu/100/agent/get-fsinfo",
+     []
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "e8ff157cf376e9ecedaf92ae1fd48c740cf0c9fe339633f386188e2813dab8f3"
+  },
+  "vm_agent_get_network_interfaces": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/qemu/100/agent/network-get-interfaces",
+     []
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "b125f1fa8ad7e831a76910af7e4a9e04bed3a05d3d39b491d8fd2d6fd166b936"
+  },
+  "vm_agent_get_osinfo": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "GET",
+     "/nodes/pve1/qemu/100/agent/get-osinfo",
+     []
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "a3342fec0d1edce9a84dd9f34cad4f3a30cedbbe778486cfd6a20bfcc76c3754"
+  },
+  "vm_agent_ping": {
+   "args": {
+    "node": "pve1",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/qemu/100/agent/ping",
+     []
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "b276db5c3ca10350c96bdf3f68b5526a76bc6ce5d33cafca5ee314feeadcc368"
+  },
+  "vm_agent_set_user_password": {
+   "args": {
+    "node": "pve1",
+    "password": "not-a-real-password",
+    "username": "jdoe",
+    "vmid": 100
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/qemu/100/agent/set-user-password",
+     [
+      [
+       "password",
+       "not-a-real-password"
+      ],
+      [
+       "username",
+       "jdoe"
+      ]
+     ]
+    ]
+   ],
+   "module": "qemu",
+   "tool_sha256": "9f19c5032fbc4df5e85b2fa28f26aec7a0804923b84a6399597d28249aa1c353"
+  },
+  "wakeonlan": {
+   "args": {
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "POST",
+     "/nodes/pve1/wakeonlan",
+     []
+    ]
+   ],
+   "module": "nodes",
+   "tool_sha256": "1de0cfda43ca6c1c098711b3aed2ef16d5cc36a678b7d99eebd28ed4c787eb52"
+  },
+  "wipe_disk": {
+   "args": {
+    "disk": "/dev/sdb",
+    "node": "pve1"
+   },
+   "calls": [
+    [
+     "PUT",
+     "/nodes/pve1/disks/wipedisk",
+     [
+      [
+       "disk",
+       "/dev/sdb"
+      ]
+     ]
+    ]
+   ],
+   "module": "disks",
+   "tool_sha256": "542082da3a4f15ad3323562c3cf67bcd5c646b4bf69d92d7791c9c4a8fb73074"
+  }
+ },
+ "upstream": "ry-ops/proxmox-mcp-server@7276144"
+}
