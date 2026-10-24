@@ -199,14 +199,6 @@ def test_guest_secrets_and_url_downloads_are_refused(b, tool, args):
     assert b.proxmox.requests == []
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Upstream regression: set_vm_config promises 'Accepts any Proxmox VM config key', "
-        "and upstream forwarded every key; router.validate_arguments rejects keys the "
-        "schema does not list (balloon, numa, net2, ...). Fix is in proxmox_mcp/router.py."
-    ),
-)
 def test_set_vm_config_accepts_undeclared_config_keys(b):
     r = b.worker.execute(
         USERS["rw"].email, "set_vm_config", {"node": "pve1", "vmid": 100, "balloon": 1024}
@@ -215,6 +207,27 @@ def test_set_vm_config_accepts_undeclared_config_keys(b):
     assert [s.call() for s in b.proxmox.requests] == [
         ["PUT", "/nodes/pve1/qemu/100/config", [["balloon", "1024"]]]
     ]
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        {"hookscript": "local:snippets/x.sh"},
+        {"args": "-device x"},
+        {"hostpci0": "01:00.0"},
+        {"usb0": "host=1-1"},
+        {"scsi3": "/dev/sda"},
+        {"serial0": "/dev/ttyS0"},
+        {"cicustom": "user=local:snippets/u.yml"},
+        {"cipassword": "x"},
+        {"bad key": 1},
+        {"numa": {"nested": 1}},
+    ],
+)
+def test_set_vm_config_freeform_keys_still_refuse_host_access(b, extra):
+    r = b.worker.execute(USERS["rw"].email, "set_vm_config", {"node": "pve1", "vmid": 100, **extra})
+    assert r.json()["ok"] is False
+    assert b.proxmox.requests == []
 
 
 # ---- MCP_ALLOW_ADMIN_TOOLS=0 ---------------------------------------------------------------

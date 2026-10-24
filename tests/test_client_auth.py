@@ -67,7 +67,9 @@ def test_dir_precedence_and_fail_closed(tmp_path, monkeypatch, creddir):
         credentials.read_credential("x")
 
 
-@pytest.mark.parametrize("name", ["../x", "a/b", ".hidden", "", "a..b", "x" * 200, "tok.dpapi", None])
+@pytest.mark.parametrize(
+    "name", ["../x", "a/b", ".hidden", "", "a..b", "x" * 200, "tok.dpapi", None]
+)
 def test_bad_names(creddir, name):
     with pytest.raises(credentials.CredentialError):
         credentials.read_credential(name)
@@ -133,7 +135,9 @@ def test_dpapi_roundtrip_windows():
 
 
 def test_parse_api_token():
-    tok = credentials.parse_api_token(f"mcp-alice@pve!mcp={SECRET}", expected_userid="mcp-alice@pve")
+    tok = credentials.parse_api_token(
+        f"mcp-alice@pve!mcp={SECRET}", expected_userid="mcp-alice@pve"
+    )
     assert tok.header() == f"PVEAPIToken=mcp-alice@pve!mcp={SECRET}"
     assert tok.token_id == "mcp-alice@pve!mcp"
     assert SECRET not in repr(tok)
@@ -159,7 +163,11 @@ def env(monkeypatch, creddir):
         return responses["default"](request)
 
     put(creddir, "pve-token-alice", f"mcp-alice@pve!mcp={SECRET}\n")
-    table = {"alice@example.com": FakeEnrollment("alice@example.com", "operator", "mcp-alice@pve", "pve-token-alice")}
+    table = {
+        "alice@example.com": FakeEnrollment(
+            "alice@example.com", "operator", "mcp-alice@pve", "pve-token-alice"
+        )
+    }
 
     def fake_enrollment_for(identity):
         if identity.kind == "local":
@@ -232,7 +240,9 @@ async def test_outbound_denial_sends_nothing(env):
 
 
 async def test_phi_write_refused(env):
-    env.table["alice@example.com"] = FakeEnrollment("alice@example.com", "rw", "mcp-alice@pve", "pve-token-alice")
+    env.table["alice@example.com"] = FakeEnrollment(
+        "alice@example.com", "rw", "mcp-alice@pve", "pve-token-alice"
+    )
     with pytest.raises(PermissionError, match=r"possible PHI detected \(ssn\)"):
         await env.c.put("/nodes/pve/qemu/100/config", {"description": "pt SSN 123-45-6789"})
     assert env.sent == [] and env.audited[-1]["deny"] == "possible PHI detected (ssn)"
@@ -240,13 +250,17 @@ async def test_phi_write_refused(env):
 
 
 async def test_bool_to_int_and_rw_write(env):
-    env.table["alice@example.com"] = FakeEnrollment("alice@example.com", "rw", "mcp-alice@pve", "pve-token-alice")
+    env.table["alice@example.com"] = FakeEnrollment(
+        "alice@example.com", "rw", "mcp-alice@pve", "pve-token-alice"
+    )
     await env.c.put("/nodes/pve/qemu/100/config", {"onboot": True, "memory": 2048})
     assert parse_qs(env.sent[0].content.decode()) == {"onboot": ["1"], "memory": ["2048"]}
 
 
 async def test_redirect_not_followed(env):
-    env.responses["default"] = lambda r: httpx.Response(302, headers={"Location": "https://evil.example.com/"})
+    env.responses["default"] = lambda r: httpx.Response(
+        302, headers={"Location": "https://evil.example.com/"}
+    )
     with pytest.raises(httpx.HTTPStatusError):
         await env.c.get("/nodes")
     assert len(env.sent) == 1
@@ -296,4 +310,7 @@ def test_config_validation(monkeypatch):
     with pytest.raises(ValueError):
         client_mod.parse_fingerprints("abcd")
     fp = "AB:" * 31 + "AB"
-    assert client_mod.parse_fingerprints(f"{fp}, {'cd' * 32}") == (bytes([0xAB]) * 32, bytes([0xCD]) * 32)
+    assert client_mod.parse_fingerprints(f"{fp}, {'cd' * 32}") == (
+        bytes([0xAB]) * 32,
+        bytes([0xCD]) * 32,
+    )

@@ -173,22 +173,49 @@ _KEY_RE = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 _SEGMENT_RE = re.compile(r"^[A-Za-z0-9_.:@=+!%-]{0,128}$")
 _ARGS_FIELDS = {"args": ("arg_keys", "args_sha256")}
 # Kept when a line must shrink to fit MAX_LINE_BYTES.
-_CORE = frozenset({
-    "side", "kind", "user", "svc", "status", "deny", "error", "tool", "target", "rpc",
-    "method", "path", "jti", "ray", "client", "request_id", "ms", "bytes", "args_sha256",
-})
+_CORE = frozenset(
+    {
+        "side",
+        "kind",
+        "user",
+        "svc",
+        "status",
+        "deny",
+        "error",
+        "tool",
+        "target",
+        "rpc",
+        "method",
+        "path",
+        "jti",
+        "ray",
+        "client",
+        "request_id",
+        "ms",
+        "bytes",
+        "args_sha256",
+    }
+)
 
 _SECRET_VALUE_RES: list[tuple[re.Pattern[str], str]] = [
-    (re.compile(r"-----BEGIN [A-Z0-9 ]+-----.*?(-----END [A-Z0-9 ]+-----|$)", re.S),
-     "[REDACTED key]"),
+    (
+        re.compile(r"-----BEGIN [A-Z0-9 ]+-----.*?(-----END [A-Z0-9 ]+-----|$)", re.S),
+        "[REDACTED key]",
+    ),
     (re.compile(r"PVEAPIToken=\S+"), "PVEAPIToken=[REDACTED]"),
     (re.compile(r"PVEAuthCookie=\S+"), "PVEAuthCookie=[REDACTED]"),
     (re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+"), "Bearer [REDACTED]"),
     (re.compile(r"eyJ[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]*"), "[REDACTED jwt]"),
-    (re.compile(r"(?i)\b(passw\w*|secret|token|api[_-]?key|ticket|cookie|csrf\w*)(\s*[=:]\s*)\S+"),
-     r"\1\2[REDACTED]"),
-    (re.compile(r"(?i)\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b"),
-     "[REDACTED uuid]"),
+    (
+        re.compile(
+            r"(?i)\b(passw\w*|secret|token|api[_-]?key|ticket|cookie|csrf\w*)(\s*[=:]\s*)\S+"
+        ),
+        r"\1\2[REDACTED]",
+    ),
+    (
+        re.compile(r"(?i)\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b"),
+        "[REDACTED uuid]",
+    ),
 ]
 
 _LINE_MAC_RE = re.compile(rb'^(\{.*),"mac":"([0-9a-f]{64})"\}$')
@@ -220,7 +247,9 @@ def line_hash(line: bytes) -> str:
 
 
 def canonical_args_hash(args: Any) -> str:
-    canonical = json.dumps(args, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str)
+    canonical = json.dumps(
+        args, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str
+    )
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
@@ -232,10 +261,14 @@ _args_key: bytes | None = None
 
 def args_digest(args: Any) -> str:
     """Digest of tool or API arguments for audit lines: HMAC when keyed, else sha256."""
-    canonical = json.dumps(args, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str)
+    canonical = json.dumps(
+        args, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str
+    )
     if _args_key is None:
         return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-    return hmac.new(_args_key, b"proxmox-mcp-args-v1\0" + canonical.encode("utf-8"), hashlib.sha256).hexdigest()
+    return hmac.new(
+        _args_key, b"proxmox-mcp-args-v1\0" + canonical.encode("utf-8"), hashlib.sha256
+    ).hexdigest()
 
 
 # ---- HMAC keys -----------------------------------------------------------------------
@@ -395,13 +428,14 @@ def _fit(fields: dict[str, Any], budget: int) -> dict[str, Any]:
     if len(_dumps(fields)) <= budget:
         return fields
     fields = dict(fields)
-    sizes = sorted(
-        ((len(_dumps(v)), k) for k, v in fields.items() if k not in _CORE), reverse=True
-    )
+    sizes = sorted(((len(_dumps(v)), k) for k, v in fields.items() if k not in _CORE), reverse=True)
     for size, key in sizes:
         if len(_dumps(fields)) <= budget:
             return fields
-        fields[key] = {"dropped": size, "sha256": hashlib.sha256(_dumps(fields[key]).encode()).hexdigest()[:16]}
+        fields[key] = {
+            "dropped": size,
+            "sha256": hashlib.sha256(_dumps(fields[key]).encode()).hexdigest()[:16],
+        }
     limit = 256
     while len(_dumps(fields)) > budget and limit >= 16:
         fields = {k: (_cap(v, limit) if isinstance(v, str) else v) for k, v in fields.items()}
@@ -444,7 +478,9 @@ _health: dict[str, Any] = {"ok": True, "failures": 0, "last_error": None, "last_
 
 
 def _now_iso() -> str:
-    return _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    return (
+        _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    )
 
 
 def _record_failure(reason: str) -> None:
@@ -540,7 +576,8 @@ def _siblings(path: str) -> list[str]:
     except OSError:
         return []
     return [
-        os.path.join(directory, n) for n in names
+        os.path.join(directory, n)
+        for n in names
         if n.startswith(stem + "-") and n.endswith(".jsonl")
     ]
 
@@ -661,7 +698,11 @@ class AuditLog:
         with _interprocess_lock(self.path):
             existed = os.path.lexists(self.path)
             flags = os.O_RDWR | os.O_APPEND | os.O_CREAT
-            flags |= getattr(os, "O_BINARY", 0) | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+            flags |= (
+                getattr(os, "O_BINARY", 0)
+                | getattr(os, "O_CLOEXEC", 0)
+                | getattr(os, "O_NOFOLLOW", 0)
+            )
             fd = os.open(self.path, flags, 0o600)
             try:
                 st = os.fstat(fd)
@@ -881,7 +922,9 @@ class Verifier:
                 if seq != expected:
                     reasons.append("seq_gap")
                     if len(self.gaps) < _MAX_REPORTED:
-                        self.gaps.append({"path": path, "line": lineno, "expected": expected, "got": seq})
+                        self.gaps.append(
+                            {"path": path, "line": lineno, "expected": expected, "got": seq}
+                        )
             elif ph == GENESIS and seq != 0:
                 reasons.append("seq_gap")
             self._check_mac(raw, rec, reasons)
@@ -901,7 +944,9 @@ class Verifier:
             self.breaks += 1
             if len(self.problems) < _MAX_REPORTED:
                 seq_value = rec.get("seq") if rec else None
-                self.problems.append({"path": path, "line": lineno, "seq": seq_value, "reasons": reasons})
+                self.problems.append(
+                    {"path": path, "line": lineno, "seq": seq_value, "reasons": reasons}
+                )
         return reasons
 
     def feed_file(self, path: str | os.PathLike) -> None:
@@ -913,15 +958,17 @@ class Verifier:
                 self.feed(raw, name, lineno)
                 if first_seq is None and self.last_seq is not None and self.lines > before[0]:
                     first_seq, first_ts = self.last_seq, self.last_ts
-        self.files.append({
-            "path": name,
-            "lines": self.lines - before[0],
-            "breaks": self.breaks - before[1],
-            "first_seq": first_seq if self.lines > before[0] else None,
-            "last_seq": self.last_seq if self.lines > before[0] else None,
-            "first_ts": first_ts,
-            "last_ts": self.last_ts if self.lines > before[0] else None,
-        })
+        self.files.append(
+            {
+                "path": name,
+                "lines": self.lines - before[0],
+                "breaks": self.breaks - before[1],
+                "first_seq": first_seq if self.lines > before[0] else None,
+                "last_seq": self.last_seq if self.lines > before[0] else None,
+                "first_ts": first_ts,
+                "last_ts": self.last_ts if self.lines > before[0] else None,
+            }
+        )
 
     def _mac_status(self) -> str:
         m = self.mac
@@ -945,10 +992,14 @@ class Verifier:
             if not ok:
                 breaks += 1
                 reason = "anchor_missing" if self._anchor_hash is None else "anchor_mismatch"
-                problems.append({"path": None, "line": None, "seq": self.anchor[0], "reasons": [reason]})
+                problems.append(
+                    {"path": None, "line": None, "seq": self.anchor[0], "reasons": [reason]}
+                )
         if self.require_mac and self._mac_status() != "verified" and breaks == 0:
             breaks += 1
-            problems.append({"path": None, "line": None, "seq": None, "reasons": ["mac_not_verified"]})
+            problems.append(
+                {"path": None, "line": None, "seq": None, "reasons": ["mac_not_verified"]}
+            )
         return {
             "ok": breaks == 0,
             "files": self.files,
@@ -975,7 +1026,9 @@ class Verifier:
         }
 
 
-def verify_lines(lines: Iterable[bytes], prev_hash: str | None = None) -> tuple[int, int, str | None]:
+def verify_lines(
+    lines: Iterable[bytes], prev_hash: str | None = None
+) -> tuple[int, int, str | None]:
     """(lines, breaks, last_hash). The first line is the anchor when prev_hash is None.
 
     Unkeyed check (ph + seq + downgrade). Use verify_files for macs and a summary.
@@ -986,7 +1039,9 @@ def verify_lines(lines: Iterable[bytes], prev_hash: str | None = None) -> tuple[
     return v.lines, v.breaks, v.prev_hash
 
 
-def verify_chain(paths: str | os.PathLike | Iterable[str | os.PathLike], prev_hash: str | None = None) -> int:
+def verify_chain(
+    paths: str | os.PathLike | Iterable[str | os.PathLike], prev_hash: str | None = None
+) -> int:
     """Number of chain breaks across one file or several files in order (0 = intact)."""
     if isinstance(paths, (str, os.PathLike)):
         paths = [paths]
@@ -1061,13 +1116,26 @@ def main(argv: list[str] | None = None) -> int:
     error (nothing was verified).
     """
     parser = _Parser(prog="proxmox-mcp-audit-verify", add_help=True)
-    parser.add_argument("files", nargs="*", help="files oldest first (default: --dir of MCP_AUDIT_LOG)")
-    parser.add_argument("--dir", help="verify every audit-*.jsonl plus audit.jsonl in DIR, ordered by seq")
-    parser.add_argument("--key-file", action="append", default=[], help="HMAC key copy (repeatable)")
-    parser.add_argument("--no-credential", action="store_true",
-                        help="do not try the broker's audit-hmac.key credential")
-    parser.add_argument("--require-mac", action="store_true", help="every line must carry a verified mac")
-    parser.add_argument("--anchor", help="SEQ:HASH recorded at the last WORM upload (truncation check)")
+    parser.add_argument(
+        "files", nargs="*", help="files oldest first (default: --dir of MCP_AUDIT_LOG)"
+    )
+    parser.add_argument(
+        "--dir", help="verify every audit-*.jsonl plus audit.jsonl in DIR, ordered by seq"
+    )
+    parser.add_argument(
+        "--key-file", action="append", default=[], help="HMAC key copy (repeatable)"
+    )
+    parser.add_argument(
+        "--no-credential",
+        action="store_true",
+        help="do not try the broker's audit-hmac.key credential",
+    )
+    parser.add_argument(
+        "--require-mac", action="store_true", help="every line must carry a verified mac"
+    )
+    parser.add_argument(
+        "--anchor", help="SEQ:HASH recorded at the last WORM upload (truncation check)"
+    )
     try:
         args = parser.parse_args(sys.argv[1:] if argv is None else argv)
         anchor = _parse_anchor(args.anchor) if args.anchor else None

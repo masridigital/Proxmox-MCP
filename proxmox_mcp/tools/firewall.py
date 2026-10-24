@@ -411,7 +411,7 @@ async def handle(name: str, args: dict[str, Any], client: ProxmoxClient) -> Any:
         return await client.get("/cluster/firewall/rules")
 
     elif name == "add_cluster_firewall_rule":
-        data = {k: v for k, v in args.items()}
+        data = dict(args)
         return await client.post("/cluster/firewall/rules", data)
 
     elif name == "update_cluster_firewall_rule":
@@ -427,14 +427,14 @@ async def handle(name: str, args: dict[str, Any], client: ProxmoxClient) -> Any:
         return await client.get("/cluster/firewall/options")
 
     elif name == "set_cluster_firewall_options":
-        data = {k: v for k, v in args.items()}
+        data = dict(args)
         return await client.put("/cluster/firewall/options", data)
 
     elif name == "list_firewall_groups":
         return await client.get("/cluster/firewall/groups")
 
     elif name == "create_firewall_group":
-        data = {k: v for k, v in args.items()}
+        data = dict(args)
         return await client.post("/cluster/firewall/groups", data)
 
     elif name == "delete_firewall_group":
@@ -450,13 +450,15 @@ async def handle(name: str, args: dict[str, Any], client: ProxmoxClient) -> Any:
 
     elif name == "delete_firewall_group_rule":
         params = {k: args[k] for k in ("digest",) if k in args}
-        return await client.delete(f"/cluster/firewall/groups/{args['group']}/{args['pos']}", params or None)
+        return await client.delete(
+            f"/cluster/firewall/groups/{args['group']}/{args['pos']}", params or None
+        )
 
     elif name == "list_firewall_aliases":
         return await client.get("/cluster/firewall/aliases")
 
     elif name == "create_firewall_alias":
-        data = {k: v for k, v in args.items()}
+        data = dict(args)
         return await client.post("/cluster/firewall/aliases", data)
 
     elif name == "update_firewall_alias":
@@ -472,7 +474,7 @@ async def handle(name: str, args: dict[str, Any], client: ProxmoxClient) -> Any:
         return await client.get("/cluster/firewall/ipset")
 
     elif name == "create_firewall_ipset":
-        data = {k: v for k, v in args.items()}
+        data = dict(args)
         return await client.post("/cluster/firewall/ipset", data)
 
     elif name == "delete_firewall_ipset":
@@ -489,6 +491,7 @@ async def handle(name: str, args: dict[str, Any], client: ProxmoxClient) -> Any:
 
     elif name == "delete_firewall_ipset_entry":
         from urllib.parse import quote
+
         cidr = quote(args["cidr"], safe="")
         params = {k: args[k] for k in ("digest",) if k in args}
         return await client.delete(f"/cluster/firewall/ipset/{args['name']}/{cidr}", params or None)
@@ -503,7 +506,9 @@ async def handle(name: str, args: dict[str, Any], client: ProxmoxClient) -> Any:
 
     elif name == "delete_node_firewall_rule":
         params = {k: args[k] for k in ("digest",) if k in args}
-        return await client.delete(f"/nodes/{args['node']}/firewall/rules/{args['pos']}", params or None)
+        return await client.delete(
+            f"/nodes/{args['node']}/firewall/rules/{args['pos']}", params or None
+        )
 
     elif name == "get_node_firewall_options":
         return await client.get(f"/nodes/{args['node']}/firewall/options")

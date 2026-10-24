@@ -176,7 +176,9 @@ TOOLS = [
                 "node": NODE,
                 "name": OPT_STR("Pool name"),
                 "devices": OPT_STR("Comma-separated device paths"),
-                "raidlevel": OPT_STR("RAID level: single, mirror, raidz, raidz2, raidz3, draid, etc."),
+                "raidlevel": OPT_STR(
+                    "RAID level: single, mirror, raidz, raidz2, raidz3, draid, etc."
+                ),
                 "ashift": OPT_INT("Ashift value (9-16, 0=auto)"),
                 "compression": OPT_STR("Compression: on, off, lzjb, lz4, zle, gzip, zstd"),
                 "add_storage": OPT_BOOL("Add as storage"),

@@ -20,8 +20,13 @@ TOOLS = [
         "inputSchema": {
             "type": "object",
             "properties": {
-                "node": {**NODE, "description": "Node name (optional — omit for cluster-wide config)"},
-                "type": OPT_STR("Filter by storage type: dir, lvm, lvmthin, zfspool, nfs, cifs, rbd, pbs, glusterfs, iscsi, etc."),
+                "node": {
+                    **NODE,
+                    "description": "Node name (optional — omit for cluster-wide config)",
+                },
+                "type": OPT_STR(
+                    "Filter by storage type: dir, lvm, lvmthin, zfspool, nfs, cifs, rbd, pbs, glusterfs, iscsi, etc."
+                ),
                 "enabled": OPT_BOOL("Filter by enabled state"),
             },
         },
@@ -44,7 +49,9 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "storage": OPT_STR("Storage ID (unique name)"),
-                "type": OPT_STR("Storage type: dir, lvm, lvmthin, zfspool, nfs, cifs, rbd, pbs, btrfs"),
+                "type": OPT_STR(
+                    "Storage type: dir, lvm, lvmthin, zfspool, nfs, cifs, rbd, pbs, btrfs"
+                ),
                 "path": OPT_STR("Path for dir/btrfs storage"),
                 "server": OPT_STR("Server for NFS/CIFS/PBS storage"),
                 "export": OPT_STR("NFS export path"),
@@ -54,8 +61,12 @@ TOOLS = [
                 "vgname": OPT_STR("LVM volume group name"),
                 "thinpool": OPT_STR("LVM thin pool name"),
                 "pool": OPT_STR("ZFS pool or Ceph pool name"),
-                "content": OPT_STR("Allowed content types (comma-separated): images,rootdir,vztmpl,backup,iso,snippets"),
-                "nodes": OPT_STR("Comma-separated list of nodes that can use this storage (empty=all)"),
+                "content": OPT_STR(
+                    "Allowed content types (comma-separated): images,rootdir,vztmpl,backup,iso,snippets"
+                ),
+                "nodes": OPT_STR(
+                    "Comma-separated list of nodes that can use this storage (empty=all)"
+                ),
                 "shared": OPT_BOOL("Storage is shared between nodes"),
                 "disable": OPT_BOOL("Disable storage"),
                 "maxfiles": OPT_INT("Max backup files per VM/CT (0=unlimited)"),
@@ -114,7 +125,9 @@ TOOLS = [
             "properties": {
                 "node": NODE,
                 "storage": OPT_STR("Storage ID"),
-                "content": OPT_STR("Filter by content type: images, iso, vztmpl, backup, rootdir, snippets"),
+                "content": OPT_STR(
+                    "Filter by content type: images, iso, vztmpl, backup, rootdir, snippets"
+                ),
                 "vmid": OPT_INT("Filter by VM/CT ID"),
             },
             "required": ["node", "storage"],
@@ -128,7 +141,9 @@ TOOLS = [
             "properties": {
                 "node": NODE,
                 "storage": OPT_STR("Storage ID"),
-                "volume": OPT_STR("Volume ID (e.g. local:iso/ubuntu.iso or local-lvm:vm-100-disk-0)"),
+                "volume": OPT_STR(
+                    "Volume ID (e.g. local:iso/ubuntu.iso or local-lvm:vm-100-disk-0)"
+                ),
             },
             "required": ["node", "storage", "volume"],
         },
@@ -178,7 +193,9 @@ TOOLS = [
                 "content": OPT_STR("Content type: iso, vztmpl or import"),
                 "filename": OPT_STR("Target filename"),
                 "checksum": OPT_STR("Expected checksum"),
-                "checksum_algorithm": OPT_STR("Checksum algorithm: md5, sha1, sha224, sha256, sha384, sha512"),
+                "checksum_algorithm": OPT_STR(
+                    "Checksum algorithm: md5, sha1, sha224, sha256, sha384, sha512"
+                ),
                 "verify_certificates": OPT_BOOL("Verify SSL certificates (default true)"),
             },
             "required": ["node", "storage", "url", "content", "filename"],
@@ -219,7 +236,9 @@ TOOLS = [
             "properties": {
                 "node": NODE,
                 "vmid": OPT_INT("Target VM ID (use 0 to auto-assign)"),
-                "archive": OPT_STR("Backup archive volume ID (e.g. local:backup/vzdump-qemu-100-2024_01_01.vma.zst)"),
+                "archive": OPT_STR(
+                    "Backup archive volume ID (e.g. local:backup/vzdump-qemu-100-2024_01_01.vma.zst)"
+                ),
                 "storage": OPT_STR("Target storage for restored disks"),
                 "name": OPT_STR("VM name override"),
                 "force": OPT_BOOL("Overwrite existing VM if VMID exists"),
@@ -240,7 +259,9 @@ TOOLS = [
             "properties": {
                 "node": NODE,
                 "vmid": OPT_INT("Target container ID"),
-                "ostemplate": OPT_STR("Backup archive volume ID (e.g. local:backup/vzdump-lxc-106-2024_01_01.tar.zst)"),
+                "ostemplate": OPT_STR(
+                    "Backup archive volume ID (e.g. local:backup/vzdump-lxc-106-2024_01_01.tar.zst)"
+                ),
                 "storage": OPT_STR("Target storage for rootfs"),
                 "hostname": OPT_STR("Hostname override"),
                 "force": OPT_BOOL("Overwrite existing container"),
@@ -269,7 +290,7 @@ async def handle(name: str, args: dict[str, Any], client: ProxmoxClient) -> Any:
         return await client.get(f"/storage/{args['storage']}")
 
     elif name == "create_storage":
-        data = {k: v for k, v in args.items()}
+        data = dict(args)
         return await client.post("/storage", data)
 
     elif name == "update_storage":
@@ -285,36 +306,50 @@ async def handle(name: str, args: dict[str, Any], client: ProxmoxClient) -> Any:
 
     elif name == "list_storage_content":
         params = {k: args[k] for k in ("content", "vmid") if k in args}
-        return await client.get(f"/nodes/{args['node']}/storage/{args['storage']}/content", params or None)
+        return await client.get(
+            f"/nodes/{args['node']}/storage/{args['storage']}/content", params or None
+        )
 
     elif name == "get_storage_volume_info":
         from urllib.parse import quote
+
         vol = quote(args["volume"], safe="")
         return await client.get(f"/nodes/{args['node']}/storage/{args['storage']}/content/{vol}")
 
     elif name == "delete_storage_volume":
         from urllib.parse import quote
+
         vol = quote(args["volume"], safe="")
         params = {}
         if "delay" in args:
             params["delay"] = args["delay"]
-        return await client.delete(f"/nodes/{args['node']}/storage/{args['storage']}/content/{vol}", params or None)
+        return await client.delete(
+            f"/nodes/{args['node']}/storage/{args['storage']}/content/{vol}", params or None
+        )
 
     elif name == "copy_storage_volume":
         data = {"target": args["target"]}
         if "target_node" in args:
             data["target_node"] = args["target_node"]
         from urllib.parse import quote
+
         vol = quote(args["volume"], safe="")
-        return await client.post(f"/nodes/{args['node']}/storage/{args['storage']}/content/{vol}", data)
+        return await client.post(
+            f"/nodes/{args['node']}/storage/{args['storage']}/content/{vol}", data
+        )
 
     elif name == "download_url_to_storage":
         data = {k: v for k, v in args.items() if k not in ("node", "storage")}
         # The API spells these with hyphens; underscores fail with "400 Parameter verification failed".
-        for snake, hyphen in (("checksum_algorithm", "checksum-algorithm"), ("verify_certificates", "verify-certificates")):
+        for snake, hyphen in (
+            ("checksum_algorithm", "checksum-algorithm"),
+            ("verify_certificates", "verify-certificates"),
+        ):
             if snake in data:
                 data[hyphen] = data.pop(snake)
-        return await client.post(f"/nodes/{args['node']}/storage/{args['storage']}/download-url", data)
+        return await client.post(
+            f"/nodes/{args['node']}/storage/{args['storage']}/download-url", data
+        )
 
     elif name == "backup_vm":
         node = args["node"]

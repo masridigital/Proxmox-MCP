@@ -686,6 +686,13 @@ class GuardApp:
             await _send_json(send, 404, {"error": "not found"})
             return
         if path == HEALTH_PATH and method in ("GET", "HEAD") and not scope.get("query_string"):
+            from .. import audit
+
+            # Every tool call fails closed when the audit log cannot be written, so a
+            # broken sink is an outage: report it to monitoring (SOC 2 CC7.3), no detail.
+            if not audit.health().get("ok", True):
+                await _send_body(send, 503, b"unavailable", b"text/plain; charset=utf-8")
+                return
             await _send_body(send, 200, b"ok", b"text/plain; charset=utf-8")
             return
         app = self.routes.get(path)

@@ -88,3 +88,9 @@ def test_successful_execute_is_not_double_audited(client):
     body = body_of({"tool": "list_nodes"})
     client.post("/v1/execute", content=body, headers=auth_headers(body))
     assert _http_lines() == []  # server.run_tool writes the tool lines itself
+
+
+def test_healthz_reports_broken_audit_sink(client, monkeypatch):
+    monkeypatch.setattr(audit, "health", lambda: {"ok": False})
+    r = client.get("/healthz")
+    assert r.status_code == 503 and r.text == "unavailable"

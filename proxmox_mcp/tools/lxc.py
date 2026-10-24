@@ -166,7 +166,9 @@ TOOLS = [
             "properties": {
                 "node": NODE,
                 "vmid": OPT_INT("Container ID (omit to auto-assign)"),
-                "ostemplate": OPT_STR("Template (e.g. local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst)"),
+                "ostemplate": OPT_STR(
+                    "Template (e.g. local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst)"
+                ),
                 "hostname": OPT_STR("Container hostname"),
                 "memory": OPT_INT("RAM in MB (default 512)"),
                 "swap": OPT_INT("Swap in MB (default 512)"),

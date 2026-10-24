@@ -384,9 +384,11 @@ ALLOWLIST: list[tuple[str, str]] = [
 # Writes an "operator" may make: guest power, snapshots (create), backups,
 # migration, agent ping, node wake-on-LAN. Everything else that writes needs rw.
 OPERATOR_WRITES: list[tuple[str, str]] = [
-    *[(f"/nodes/{{node}}/{kind}/{{vmid}}/status/{action}", "POST")
-      for kind in ("qemu", "lxc")
-      for action in ("start", "stop", "shutdown", "reboot", "suspend", "resume")],
+    *[
+        (f"/nodes/{{node}}/{kind}/{{vmid}}/status/{action}", "POST")
+        for kind in ("qemu", "lxc")
+        for action in ("start", "stop", "shutdown", "reboot", "suspend", "resume")
+    ],
     ("/nodes/{node}/qemu/{vmid}/status/reset", "POST"),
     ("/nodes/{node}/qemu/{vmid}/snapshot", "POST"),
     ("/nodes/{node}/lxc/{vmid}/snapshot", "POST"),

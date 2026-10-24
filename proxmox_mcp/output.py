@@ -81,24 +81,45 @@ SECRET_PATTERNS: dict[str, re.Pattern[str]] = {
         r"(?:-{3,}\s?END [A-Z0-9 ]{0,40}PRIVATE KEY(?: BLOCK)?\s?-{3,}|$)",
         re.S | re.I,
     ),
-    "putty_key": re.compile(r"PuTTY-User-Key-File-[0-9]{1,2}:.*?(?:Private-(?:MAC|Hash):\s?[0-9a-fA-F]+|$)", re.S),
-    "proxmox_token": re.compile(r"(?:PVE|PBS|PMG)(?:APIToken|AuthCookie)\s?[=:]\s?[^\s\"',;]{1,1024}", re.I),
-    "proxmox_ticket": re.compile(r"(?<![A-Za-z])(?:PVE|PBS|PMG):[^\s\"',;:]{1,256}:[0-9A-F]{8}::[A-Za-z0-9+/=]{20,}"),
-    "authorization": re.compile(rf"{_NL}authorization\s{{0,3}}[:=]\s{{0,3}}(?P<v>(?:bearer|basic|digest|negotiate)\s{{1,3}}{_V})", re.I),
+    "putty_key": re.compile(
+        r"PuTTY-User-Key-File-[0-9]{1,2}:.*?(?:Private-(?:MAC|Hash):\s?[0-9a-fA-F]+|$)", re.S
+    ),
+    "proxmox_token": re.compile(
+        r"(?:PVE|PBS|PMG)(?:APIToken|AuthCookie)\s?[=:]\s?[^\s\"',;]{1,1024}", re.I
+    ),
+    "proxmox_ticket": re.compile(
+        r"(?<![A-Za-z])(?:PVE|PBS|PMG):[^\s\"',;:]{1,256}:[0-9A-F]{8}::[A-Za-z0-9+/=]{20,}"
+    ),
+    "authorization": re.compile(
+        rf"{_NL}authorization\s{{0,3}}[:=]\s{{0,3}}(?P<v>(?:bearer|basic|digest|negotiate)\s{{1,3}}{_V})",
+        re.I,
+    ),
     "bearer": re.compile(rf"{_NL}bearer\s{{1,3}}(?P<v>[A-Za-z0-9._~+/=\-]{{8,1024}})", re.I),
-    "labelled": re.compile(rf"{_NL}(?:{_LABEL}){_NA}[\"']{{0,2}}\s{{0,3}}[:=]{{1,2}}\s{{0,3}}[\"']?(?P<v>{_V})", re.I),
-    "sshkeys": re.compile(rf"{_NL}sshkeys[\"']?\s{{0,3}}[:=]\s{{0,3}}[\"']?(?P<v>[^&\"'\r\n]{{1,16384}})", re.I),
+    "labelled": re.compile(
+        rf"{_NL}(?:{_LABEL}){_NA}[\"']{{0,2}}\s{{0,3}}[:=]{{1,2}}\s{{0,3}}[\"']?(?P<v>{_V})", re.I
+    ),
+    "sshkeys": re.compile(
+        rf"{_NL}sshkeys[\"']?\s{{0,3}}[:=]\s{{0,3}}[\"']?(?P<v>[^&\"'\r\n]{{1,16384}})", re.I
+    ),
     "cli_flag": re.compile(
         r"(?<![\w\-])--?(?:ci)?(?:password|passwd|pass|token|secret|api-?key|client-?secret)[=\s]\s{0,2}(?P<v>[^\s\"']{1,1024})",
         re.I,
     ),
-    "url_userinfo": re.compile(r"[a-z][a-z0-9+.\-]{1,15}://[^/\s:@]{1,256}:(?P<v>[^/\s@]{1,256})@", re.I),
+    "url_userinfo": re.compile(
+        r"[a-z][a-z0-9+.\-]{1,15}://[^/\s:@]{1,256}:(?P<v>[^/\s@]{1,256})@", re.I
+    ),
     "sas_sig": re.compile(r"[?&;]sig=(?P<v>[^&\s\"']{8,1024})", re.I),
-    "jwt": re.compile(r"(?<![A-Za-z0-9_\-])eyJ[A-Za-z0-9_\-]{8,}\.eyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]*"),
+    "jwt": re.compile(
+        r"(?<![A-Za-z0-9_\-])eyJ[A-Za-z0-9_\-]{8,}\.eyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]*"
+    ),
     "cf_tunnel_token": re.compile(r"(?<![A-Za-z0-9+/=_\-])eyJhIjoi[A-Za-z0-9+/_\-]{20,}={0,2}"),
     "cf_origin_ca": re.compile(r"(?<![A-Za-z0-9])v1\.0-[0-9a-f]{24}-[0-9a-f]{146}", re.I),
-    "aws_key_id": re.compile(r"(?<![A-Za-z0-9])(?:AKIA|ASIA|ABIA|ACCA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|APKA)[A-Z0-9]{16}(?![A-Za-z0-9])"),
-    "azure_client_secret": re.compile(r"(?<![0-9A-Za-z_~.\-])[0-9A-Za-z_~.]{3}[0-9]Q~[0-9A-Za-z_~.\-]{31,34}(?![0-9A-Za-z_~.\-])"),
+    "aws_key_id": re.compile(
+        r"(?<![A-Za-z0-9])(?:AKIA|ASIA|ABIA|ACCA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|APKA)[A-Z0-9]{16}(?![A-Za-z0-9])"
+    ),
+    "azure_client_secret": re.compile(
+        r"(?<![0-9A-Za-z_~.\-])[0-9A-Za-z_~.]{3}[0-9]Q~[0-9A-Za-z_~.\-]{31,34}(?![0-9A-Za-z_~.\-])"
+    ),
     "prefixed_token": re.compile(
         r"(?<![A-Za-z0-9_\-])(?:gh[pousr]_[A-Za-z0-9]{36,255}|github_pat_[A-Za-z0-9_]{22,255}"
         r"|xox[abposr]-[A-Za-z0-9\-]{10,255}|(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{16,255}"
@@ -125,7 +146,10 @@ def is_secret_key(key: str) -> bool:
     if lower in HARMLESS_KEYS:
         return False
     folded = phi.normalize_key(str(key))
-    return any(SECRET_KEY_RE.search(k) for k in {lower, folded, lower.translate(_LEET), folded.translate(_LEET)})
+    return any(
+        SECRET_KEY_RE.search(k)
+        for k in {lower, folded, lower.translate(_LEET), folded.translate(_LEET)}
+    )
 
 
 def redact_text(text: str) -> str:
@@ -150,7 +174,10 @@ def _cross(values: list[Any]) -> dict[int, str]:
         if t is not None:
             idx.append(i)
             texts.append(t)
-    return {idx[j]: kind for j, kind in phi.cross_hits(texts, _CROSS_FINDERS + phi.phi_finders()).items()}
+    return {
+        idx[j]: kind
+        for j, kind in phi.cross_hits(texts, _CROSS_FINDERS + phi.phi_finders()).items()
+    }
 
 
 def redact(obj: Any, _depth: int = 0) -> Any:
@@ -177,7 +204,10 @@ def redact(obj: Any, _depth: int = 0) -> Any:
     if isinstance(obj, (list, tuple, set, frozenset)):
         items = list(obj)
         cross = _cross(items)
-        return [phi.token(cross[i]) if i in cross else redact(v, _depth + 1) for i, v in enumerate(items)]
+        return [
+            phi.token(cross[i]) if i in cross else redact(v, _depth + 1)
+            for i, v in enumerate(items)
+        ]
     if isinstance(obj, str):
         return redact_text(obj)
     if obj is None or isinstance(obj, (bool, int, float)):
@@ -242,13 +272,17 @@ def _wrap(body: str) -> str:
 
 
 def _too_large(size: int, limit: int) -> str:
-    return _wrap(_dumps({
-        "error": "result too large",
-        "bytes": size,
-        "limit": limit,
-        "hint": "Narrow the query: filter by node, vmid, type or time range, "
-        "or request a single object instead of a list.",
-    }))
+    return _wrap(
+        _dumps(
+            {
+                "error": "result too large",
+                "bytes": size,
+                "limit": limit,
+                "hint": "Narrow the query: filter by node, vmid, type or time range, "
+                "or request a single object instead of a list.",
+            }
+        )
+    )
 
 
 def render_result(obj: Any) -> str:

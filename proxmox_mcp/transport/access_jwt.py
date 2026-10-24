@@ -345,7 +345,7 @@ class AccessVerifier:
         if not isinstance(iss, str) or iss != self.issuer:
             raise AccessDenied("issuer mismatch")
         token_type = claims.get("type")
-        if token_type is not None and token_type != "app":
+        if token_type is not None and token_type != "app":  # noqa: S105 - JWT "type" claim, not a secret
             raise AccessDenied("not an application token")
         return claims
 

@@ -24,8 +24,12 @@ def lines(path):
 
 
 def test_start_event_chain_and_no_values(log_path):
-    audit.audit_event(side="in", user="a@example.com", tool="get_vm_status",
-                      args={"node": "pve", "vmid": 100, "description": "secret value"})
+    audit.audit_event(
+        side="in",
+        user="a@example.com",
+        tool="get_vm_status",
+        args={"node": "pve", "vmid": 100, "description": "secret value"},
+    )
     audit.audit_event(side="out", user="a@example.com", method="GET", path="/nodes", status=200)
     recs = lines(log_path)
     assert recs[0]["kind"] == "start" and recs[0]["ph"] == "genesis" and "version" in recs[0]
@@ -40,7 +44,9 @@ def test_start_event_chain_and_no_values(log_path):
 
 
 def test_args_hash_is_canonical():
-    assert audit.canonical_args_hash({"a": 1, "b": 2}) == audit.canonical_args_hash({"b": 2, "a": 1})
+    assert audit.canonical_args_hash({"a": 1, "b": 2}) == audit.canonical_args_hash(
+        {"b": 2, "a": 1}
+    )
 
 
 def test_secret_looking_fields_dropped(log_path):

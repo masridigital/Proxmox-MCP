@@ -93,8 +93,17 @@ _SPECIAL_RE = re.compile(
     r"[^\x00-\x7f]|(?:%[0-9A-Fa-f]{2})+|&#[0-9]{1,7};|&#[xX][0-9A-Fa-f]{1,6};"
     r"|&(?:lt|gt|amp|quot|apos|colon|num|sol|nbsp);|\\u[0-9A-Fa-f]{4}|\\x[0-9A-Fa-f]{2}"
 )
-_ENTITIES = {"lt": "<", "gt": ">", "amp": "&", "quot": '"', "apos": "'", "colon": ":", "num": "#",
-             "sol": "/", "nbsp": " "}
+_ENTITIES = {
+    "lt": "<",
+    "gt": ">",
+    "amp": "&",
+    "quot": '"',
+    "apos": "'",
+    "colon": ":",
+    "num": "#",
+    "sol": "/",
+    "nbsp": " ",
+}
 
 
 @lru_cache(maxsize=8192)
@@ -183,7 +192,9 @@ class Normalized:
 # ---------------------------------------------------------------------------------------
 
 _I = re.IGNORECASE
-_NOT_LETTER_BEFORE = r"(?<![^\W_])"  # no letter or digit before a label ("patient_dob" ok, "S4MBI1" not)
+_NOT_LETTER_BEFORE = (
+    r"(?<![^\W_])"  # no letter or digit before a label ("patient_dob" ok, "S4MBI1" not)
+)
 _NOT_LETTER_AFTER = r"(?![^\W\d_])"
 _SEP = r"""["'\s+]{0,4}(?:[:#=\-]{1,2})?["'\s+]{0,4}"""
 _W = r"[\s_\-]{0,2}"  # word gap inside a label
@@ -199,7 +210,9 @@ def _labelled(label: str, value: str, unspaced: str = "") -> re.Pattern[str]:
     )
 
 
-_SSN_VALUE = r"(?!000|666|9[0-9]{2})[0-9]{3}[\s.\-]{0,2}(?!00)[0-9]{2}[\s.\-]{0,2}(?!0000)[0-9]{4}(?![0-9])"
+_SSN_VALUE = (
+    r"(?!000|666|9[0-9]{2})[0-9]{3}[\s.\-]{0,2}(?!00)[0-9]{2}[\s.\-]{0,2}(?!0000)[0-9]{4}(?![0-9])"
+)
 _SSN_LABELLED = _labelled(
     rf"ssn|ss{_W}(?:#|no\.?|num(?:ber)?)|soc(?:ial)?\.?{_W}sec(?:urity)?\.?(?:{_W}(?:number|num|nbr|no\.?|#))?"
     rf"|(?:numero{_W}de{_W})?seguro{_W}social",
@@ -212,7 +225,8 @@ _SSN_BARE = re.compile(
 _A = "[AC-HJKMNP-RT-Y]"
 _AN = "[AC-HJKMNP-RT-Y0-9]"
 _MBI = re.compile(
-    rf"(?<![A-Za-z0-9\-])[1-9]{_A}{_AN}[0-9]-?{_A}{_AN}[0-9]-?{_A}{_A}[0-9]{{2}}(?![A-Za-z0-9\-])", _I
+    rf"(?<![A-Za-z0-9\-])[1-9]{_A}{_AN}[0-9]-?{_A}{_AN}[0-9]-?{_A}{_A}[0-9]{{2}}(?![A-Za-z0-9\-])",
+    _I,
 )
 _MBI_LABELLED = _labelled(
     rf"medicare(?:{_W}(?:id|no\.?|num(?:ber)?|#|beneficiary(?:{_W}(?:id|identifier))?))?|mbi|hicn"
@@ -254,7 +268,9 @@ _DOB = _labelled(
     _DATE,
     r"出生日期|出生年月日|생년월일",
 )
-_CARD = re.compile(r"(?<![0-9A-Za-z\-])(?<![0-9][.,])[0-9](?:[ \-.]{0,2}[0-9]){12,18}(?![0-9A-Za-z]|[\-.,][0-9])")
+_CARD = re.compile(
+    r"(?<![0-9A-Za-z\-])(?<![0-9][.,])[0-9](?:[ \-.]{0,2}[0-9]){12,18}(?![0-9A-Za-z]|[\-.,][0-9])"
+)
 _EMAIL = re.compile(
     r"(?<![A-Za-z0-9._%+\-])[A-Za-z0-9._%+\-]{1,64}@[A-Za-z0-9\-]{1,63}(?:\.[A-Za-z0-9\-]{1,63}){0,8}"
     r"\.[A-Za-z]{2,24}(?![A-Za-z0-9\-])"
@@ -265,8 +281,16 @@ _PHONE = re.compile(
 _B64_RUN = re.compile(r"(?<![A-Za-z0-9+/=_\-])[A-Za-z0-9+/_\-]{16,}={0,2}(?![A-Za-z0-9+/=_\-])")
 
 PATTERNS: dict[str, re.Pattern[str]] = {
-    "ssn_labelled": _SSN_LABELLED, "ssn_bare": _SSN_BARE, "mbi": _MBI, "mbi_labelled": _MBI_LABELLED,
-    "mrn": _MRN, "dob": _DOB, "card": _CARD, "email": _EMAIL, "phone": _PHONE, "base64_run": _B64_RUN,
+    "ssn_labelled": _SSN_LABELLED,
+    "ssn_bare": _SSN_BARE,
+    "mbi": _MBI,
+    "mbi_labelled": _MBI_LABELLED,
+    "mrn": _MRN,
+    "dob": _DOB,
+    "card": _CARD,
+    "email": _EMAIL,
+    "phone": _PHONE,
+    "base64_run": _B64_RUN,
     "special": _SPECIAL_RE,
 }
 
@@ -299,7 +323,9 @@ def _card_ok(m: re.Match[str]) -> bool:
     return 13 <= len(digits) <= 19 and _card_brand_ok(digits) and _luhn_ok(digits)
 
 
-def regex_finder(kind: str, rx: re.Pattern[str], check: Callable[[re.Match[str]], bool] | None = None) -> Finder:
+def regex_finder(
+    kind: str, rx: re.Pattern[str], check: Callable[[re.Match[str]], bool] | None = None
+) -> Finder:
     """A finder yielding the "v" group span (or the whole match) for each match of rx."""
     has_v = "v" in rx.groupindex
 
@@ -437,14 +463,26 @@ def cross_hits(pieces: list[str], finders: list[Finder]) -> dict[int, str]:
 # ---------------------------------------------------------------------------------------
 
 _PHI_KEY_RES = [
-    ("ssn", r"ssn|ss_?(?:no|num|number)|social_?sec(?:urity)?(?:_?(?:no|num|number))?|soc_?sec|seguro_?social"),
+    (
+        "ssn",
+        r"ssn|ss_?(?:no|num|number)|social_?sec(?:urity)?(?:_?(?:no|num|number))?|soc_?sec|seguro_?social",
+    ),
     ("mbi", r"mbi|hicn|medicare(?:_?(?:id|no|num|number|beneficiary(?:_?id)?))?|beneficiary_?id"),
-    ("mrn", r"mrn|mr_?(?:no|num|number)|med_?rec(?:ord)?s?(?:_?(?:no|num|number|id))?"
-            r"|medical_?records?(?:_?(?:no|num|number|id))?|patient_?(?:id|no|num|number)"
-            r"|chart_?(?:no|num|number|id)|expediente|historia_?clinica|prontuario"),
-    ("dob", r"dob|date_?of_?birth|birth_?date|birthday|b_?date|fecha_?(?:de_?)?nacimiento"
-            r"|date_?de_?naissance|data_?de_?nascimento"),
-    ("card", r"(?:credit_?)?card_?(?:no|num|number)|cc_?(?:no|num|number)|credit_?card|pan_?number"),
+    (
+        "mrn",
+        r"mrn|mr_?(?:no|num|number)|med_?rec(?:ord)?s?(?:_?(?:no|num|number|id))?"
+        r"|medical_?records?(?:_?(?:no|num|number|id))?|patient_?(?:id|no|num|number)"
+        r"|chart_?(?:no|num|number|id)|expediente|historia_?clinica|prontuario",
+    ),
+    (
+        "dob",
+        r"dob|date_?of_?birth|birth_?date|birthday|b_?date|fecha_?(?:de_?)?nacimiento"
+        r"|date_?de_?naissance|data_?de_?nascimento",
+    ),
+    (
+        "card",
+        r"(?:credit_?)?card_?(?:no|num|number)|cc_?(?:no|num|number)|credit_?card|pan_?number",
+    ),
 ]
 PHI_KEY_RE = re.compile(
     "|".join(rf"(?P<{kind}>(?:^|_)(?:{rx})(?:_|$))" for kind, rx in _PHI_KEY_RES)

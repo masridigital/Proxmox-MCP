@@ -97,7 +97,9 @@ TOOLS = [
             "properties": {
                 "name": OPT_STR("Endpoint name"),
                 "mailto": OPT_STR("Recipient email (comma-separated)"),
-                "mailto-user": OPT_STR("Send to these Proxmox user emails (comma-separated user IDs)"),
+                "mailto-user": OPT_STR(
+                    "Send to these Proxmox user emails (comma-separated user IDs)"
+                ),
                 "from-address": OPT_STR("From address override"),
                 "author": OPT_STR("Author name"),
                 "comment": OPT_STR("Comment"),
@@ -285,7 +287,7 @@ async def handle(name: str, args: dict[str, Any], client: ProxmoxClient) -> Any:
         return await client.get(f"{base}/endpoints/gotify/{args['name']}")
 
     elif name == "create_gotify_endpoint":
-        data = {k: v for k, v in args.items()}
+        data = dict(args)
         return await client.post(f"{base}/endpoints/gotify", data)
 
     elif name == "update_gotify_endpoint":
@@ -303,7 +305,7 @@ async def handle(name: str, args: dict[str, Any], client: ProxmoxClient) -> Any:
         return await client.get(f"{base}/endpoints/sendmail/{args['name']}")
 
     elif name == "create_sendmail_endpoint":
-        data = {k: v for k, v in args.items()}
+        data = dict(args)
         return await client.post(f"{base}/endpoints/sendmail", data)
 
     elif name == "update_sendmail_endpoint":
@@ -318,7 +320,7 @@ async def handle(name: str, args: dict[str, Any], client: ProxmoxClient) -> Any:
         return await client.get(f"{base}/endpoints/smtp")
 
     elif name == "create_smtp_endpoint":
-        data = {k: v for k, v in args.items()}
+        data = dict(args)
         return await client.post(f"{base}/endpoints/smtp", data)
 
     elif name == "delete_smtp_endpoint":
@@ -328,7 +330,7 @@ async def handle(name: str, args: dict[str, Any], client: ProxmoxClient) -> Any:
         return await client.get(f"{base}/endpoints/webhook")
 
     elif name == "create_webhook_endpoint":
-        data = {k: v for k, v in args.items()}
+        data = dict(args)
         return await client.post(f"{base}/endpoints/webhook", data)
 
     elif name == "delete_webhook_endpoint":
@@ -341,7 +343,7 @@ async def handle(name: str, args: dict[str, Any], client: ProxmoxClient) -> Any:
         return await client.get(f"{base}/matchers/{args['name']}")
 
     elif name == "create_notification_matcher":
-        data = {k: v for k, v in args.items()}
+        data = dict(args)
         return await client.post(f"{base}/matchers", data)
 
     elif name == "update_notification_matcher":

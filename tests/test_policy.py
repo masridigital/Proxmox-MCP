@@ -122,22 +122,50 @@ def test_dangerous_tools_are_forbidden(name):
 
 @pytest.mark.parametrize(
     "name",
-    ["create_cluster_join", "termproxy_node", "node_vncshell", "get_ticket", "apt_upgrade_node",
-     "set_vm_password", "regenerate_user_token", "ceph_purge", "node_reboot", "execute_cmd"],
+    [
+        "create_cluster_join",
+        "termproxy_node",
+        "node_vncshell",
+        "get_ticket",
+        "apt_upgrade_node",
+        "set_vm_password",
+        "regenerate_user_token",
+        "ceph_purge",
+        "node_reboot",
+        "execute_cmd",
+    ],
 )
 def test_hypothetical_dangerous_names_hit_the_regex(name):
     assert policy.FORBIDDEN_RE.search(name)
 
 
 def test_destructive_vm_ops_are_admin():
-    for name in ("delete_vm", "rollback_vm_snapshot", "delete_container", "clone_vm", "set_vm_config",
-                 "resize_vm_disk", "migrate_vm", "add_vm_firewall_rule", "update_pool"):
+    for name in (
+        "delete_vm",
+        "rollback_vm_snapshot",
+        "delete_container",
+        "clone_vm",
+        "set_vm_config",
+        "resize_vm_disk",
+        "migrate_vm",
+        "add_vm_firewall_rule",
+        "update_pool",
+    ):
         assert policy.tool_tier(name) == "admin", name
 
 
 def test_lifecycle_ops_are_operate():
-    for name in ("start_vm", "stop_vm", "shutdown_vm", "reboot_vm", "suspend_vm", "resume_vm",
-                 "create_vm_snapshot", "start_container", "shutdown_container"):
+    for name in (
+        "start_vm",
+        "stop_vm",
+        "shutdown_vm",
+        "reboot_vm",
+        "suspend_vm",
+        "resume_vm",
+        "create_vm_snapshot",
+        "start_container",
+        "shutdown_container",
+    ):
         assert policy.tool_tier(name) == "operate", name
 
 
@@ -198,7 +226,11 @@ def test_non_get_tools_are_never_read():
 
 
 def test_delete_tools_are_admin_or_forbidden():
-    bad = [n for n, ms in TRACE.items() if "DELETE" in ms and policy.tool_tier(n) in ("read", "operate")]
+    bad = [
+        n
+        for n, ms in TRACE.items()
+        if "DELETE" in ms and policy.tool_tier(n) in ("read", "operate")
+    ]
     assert bad == []
 
 
@@ -335,8 +367,13 @@ def test_catalog_entries_are_copies():
 
 
 def test_enrollment_valid_and_lowercased(tmp_path):
-    path = _write(tmp_path, {"users": {"Alice@Example.COM": _entry("rw")},
-                             "services": {"abc123.access": _entry("ro", "svc@pve", "pve-token-svc")}})
+    path = _write(
+        tmp_path,
+        {
+            "users": {"Alice@Example.COM": _entry("rw")},
+            "services": {"abc123.access": _entry("ro", "svc@pve", "pve-token-svc")},
+        },
+    )
     table = enrollment.load_enrollments(path)
     assert table["alice@example.com"].mode == "rw"
     assert table["alice@example.com"].subject == "alice@example.com"
@@ -344,8 +381,13 @@ def test_enrollment_valid_and_lowercased(tmp_path):
 
 
 def test_enrollment_for_user_and_service(tmp_path, monkeypatch):
-    path = _write(tmp_path, {"users": {"alice@example.com": _entry("operator")},
-                             "services": {"abc123.access": _entry("ro", "svc@pve", "pve-token-svc")}})
+    path = _write(
+        tmp_path,
+        {
+            "users": {"alice@example.com": _entry("operator")},
+            "services": {"abc123.access": _entry("ro", "svc@pve", "pve-token-svc")},
+        },
+    )
     monkeypatch.setenv("MCP_ENROLLMENT_FILE", path)
     user = Identity(subject="ignored", kind="user", email="ALICE@example.com")
     assert enrollment.enrollment_for(user).mode == "operator"
@@ -411,8 +453,15 @@ def test_invalid_file_denies_everyone(tmp_path, monkeypatch):
 def test_enrollment_reloads_on_change(tmp_path):
     path = _write(tmp_path, {"users": {"a@example.com": _entry("ro")}})
     assert enrollment.load_enrollments(path)["a@example.com"].mode == "ro"
-    _write(tmp_path, {"users": {"a@example.com": _entry("rw"),
-                                "b@example.com": _entry("ro", "bob@pve", "pve-token-bob")}})
+    _write(
+        tmp_path,
+        {
+            "users": {
+                "a@example.com": _entry("rw"),
+                "b@example.com": _entry("ro", "bob@pve", "pve-token-bob"),
+            }
+        },
+    )
     assert enrollment.load_enrollments(path)["a@example.com"].mode == "rw"
 
 
@@ -451,10 +500,19 @@ def test_guest_content_tools_are_forbidden():
     assert GUEST_CONTENT_FORBIDDEN <= forbidden
     # Any future guest-agent tool other than the three metadata reads must be forbidden too.
     agent = {n for n in ALL if "agent" in n} - {
-        "vm_agent_get_fsinfo", "vm_agent_get_network_interfaces", "vm_agent_get_osinfo", "vm_agent_ping"}
+        "vm_agent_get_fsinfo",
+        "vm_agent_get_network_interfaces",
+        "vm_agent_get_osinfo",
+        "vm_agent_ping",
+    }
     assert agent <= forbidden
-    for name in ("vm_agent_file_read", "vm_agent_file_write", "node_termproxy", "get_vm_cloudinit_dump",
-                 "download_url_to_iso"):
+    for name in (
+        "vm_agent_file_read",
+        "vm_agent_file_write",
+        "node_termproxy",
+        "get_vm_cloudinit_dump",
+        "download_url_to_iso",
+    ):
         assert policy.tool_tier(name) == "forbidden"
 
 

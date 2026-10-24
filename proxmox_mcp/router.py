@@ -105,11 +105,27 @@ _TYPES: dict[str, Callable[[Any], bool]] = {
 }
 # Keywords the validator implements. Anything else (anyOf, oneOf, allOf, not, $ref, if...)
 # fails closed instead of being silently ignored.
-_SUPPORTED_KEYWORDS = frozenset({
-    "type", "properties", "required", "description", "items", "enum", "additionalProperties",
-    "minimum", "maximum", "maxLength", "minLength", "pattern", "maxItems", "minItems", "default",
-    "title", _OPAQUE_KEY,
-})
+_SUPPORTED_KEYWORDS = frozenset(
+    {
+        "type",
+        "properties",
+        "required",
+        "description",
+        "items",
+        "enum",
+        "additionalProperties",
+        "minimum",
+        "maximum",
+        "maxLength",
+        "minLength",
+        "pattern",
+        "maxItems",
+        "minItems",
+        "default",
+        "title",
+        _OPAQUE_KEY,
+    }
+)
 _FREEFORM_KEY_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 _MAX_DEPTH = 8
 _MAX_STRING = 65536
@@ -120,10 +136,20 @@ _MAX_INT = 2**53
 # where multi-line text is the point. Elsewhere a "\n" could add a line to a guest config.
 _CONTROL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 _LINEBREAK_RE = re.compile(r"[\t\n\r\u0085  ]")
-MULTILINE_KEYS = frozenset({
-    "description", "comment", "ssh_public_keys", "ssh-public-keys", "sshkeys", "notes-template",
-    "data", "body", "certificates", "key",
-})
+MULTILINE_KEYS = frozenset(
+    {
+        "description",
+        "comment",
+        "ssh_public_keys",
+        "ssh-public-keys",
+        "sshkeys",
+        "notes-template",
+        "data",
+        "body",
+        "certificates",
+        "key",
+    }
+)
 _PATTERN_CACHE: dict[str, re.Pattern[str]] = {}
 
 
@@ -269,12 +295,8 @@ def _structure_guard(value: Any) -> None:
 # pass its strict pattern below (and outbound.safe_segment for plain segments) BEFORE the
 # handler runs; the client's outbound policy re-validates the final path.
 _PATH_KEY_GROUPS: dict[str, str] = {
-    "group": (
-        "add_firewall_group_rule delete_firewall_group list_firewall_group_rules "
-    ),
-    "groupid": (
-        "delete_group get_group update_group "
-    ),
+    "group": ("add_firewall_group_rule delete_firewall_group list_firewall_group_rules "),
+    "groupid": ("delete_group get_group update_group "),
     "id": (
         "create_metrics_server delete_acme_plugin delete_backup_job delete_metrics_server "
         "delete_replication_job get_acme_plugin get_backup_job get_replication_job "
@@ -308,77 +330,35 @@ _PATH_KEY_GROUPS: dict[str, str] = {
         "set_node_hosts set_node_time start_ceph stop_ceph upload_node_custom_cert wakeonlan "
         "wipe_disk "
     ),
-    "poolid": (
-        "delete_pool get_pool update_pool "
-    ),
-    "pos": (
-        "delete_cluster_firewall_rule update_cluster_firewall_rule "
-    ),
-    "realm": (
-        "delete_auth_domain get_auth_domain sync_auth_domain update_auth_domain "
-    ),
-    "roleid": (
-        "delete_role get_role update_role "
-    ),
-    "sid": (
-        "delete_ha_resource get_ha_resource update_ha_resource "
-    ),
-    "storage": (
-        "delete_storage get_storage_config update_storage "
-    ),
-    "userid": (
-        "add_tfa delete_user get_user get_user_tfa list_user_tokens update_user "
-    ),
-    "vnet": (
-        "create_sdn_subnet delete_sdn_vnet get_sdn_vnet list_sdn_subnets update_sdn_vnet "
-    ),
-    "zone": (
-        "delete_sdn_zone get_sdn_zone update_sdn_zone "
-    ),
-    "cidr name": (
-        "delete_firewall_ipset_entry "
-    ),
-    "first_vmid node": (
-        "deploy_cloud_vms "
-    ),
-    "group pos": (
-        "delete_firewall_group_rule "
-    ),
-    "id node": (
-        "delete_ceph_mgr "
-    ),
-    "id userid": (
-        "delete_tfa "
-    ),
-    "iface node": (
-        "get_node_network_interface "
-    ),
-    "monid node": (
-        "delete_ceph_mon "
-    ),
+    "poolid": ("delete_pool get_pool update_pool "),
+    "pos": ("delete_cluster_firewall_rule update_cluster_firewall_rule "),
+    "realm": ("delete_auth_domain get_auth_domain sync_auth_domain update_auth_domain "),
+    "roleid": ("delete_role get_role update_role "),
+    "sid": ("delete_ha_resource get_ha_resource update_ha_resource "),
+    "storage": ("delete_storage get_storage_config update_storage "),
+    "userid": ("add_tfa delete_user get_user get_user_tfa list_user_tokens update_user "),
+    "vnet": ("create_sdn_subnet delete_sdn_vnet get_sdn_vnet list_sdn_subnets update_sdn_vnet "),
+    "zone": ("delete_sdn_zone get_sdn_zone update_sdn_zone "),
+    "cidr name": ("delete_firewall_ipset_entry "),
+    "first_vmid node": ("deploy_cloud_vms "),
+    "group pos": ("delete_firewall_group_rule "),
+    "id node": ("delete_ceph_mgr "),
+    "id userid": ("delete_tfa "),
+    "iface node": ("get_node_network_interface "),
+    "monid node": ("delete_ceph_mon "),
     "name node": (
         "delete_ceph_mds delete_ceph_pool delete_directory_storage delete_lvm_group "
         "delete_lvmthin_pool delete_zfs_pool get_ceph_pool get_zfs_pool update_ceph_pool "
     ),
-    "node osdid": (
-        "delete_ceph_osd set_ceph_osd_in set_ceph_osd_out "
-    ),
-    "node pos": (
-        "delete_node_firewall_rule "
-    ),
+    "node osdid": ("delete_ceph_osd set_ceph_osd_in set_ceph_osd_out "),
+    "node pos": ("delete_node_firewall_rule "),
     "node service": (
         "get_node_service_state reload_node_service restart_node_service start_node_service "
         "stop_node_service "
     ),
-    "node storage": (
-        "download_url_to_storage get_node_storage_status list_storage_content "
-    ),
-    "node type": (
-        "get_node_scan "
-    ),
-    "node upid": (
-        "get_task_log get_task_status stop_task "
-    ),
+    "node storage": ("download_url_to_storage get_node_storage_status list_storage_content "),
+    "node type": ("get_node_scan "),
+    "node upid": ("get_task_log get_task_status stop_task "),
     "node vmid": (
         "add_container_firewall_rule add_vm_firewall_rule clone_container clone_vm "
         "convert_container_to_template convert_vm_to_template create_container_snapshot "
@@ -396,25 +376,19 @@ _PATH_KEY_GROUPS: dict[str, str] = {
         "vm_agent_exec_status vm_agent_get_fsinfo vm_agent_get_network_interfaces "
         "vm_agent_get_osinfo vm_agent_ping vm_agent_set_user_password "
     ),
-    "subnet vnet": (
-        "delete_sdn_subnet "
-    ),
-    "tokenid userid": (
-        "create_user_token delete_user_token get_user_token update_user_token "
-    ),
-    "node pos vmid": (
-        "delete_container_firewall_rule delete_vm_firewall_rule "
-    ),
+    "subnet vnet": ("delete_sdn_subnet "),
+    "tokenid userid": ("create_user_token delete_user_token get_user_token update_user_token "),
+    "node pos vmid": ("delete_container_firewall_rule delete_vm_firewall_rule "),
     "node snapname vmid": (
         "delete_container_snapshot delete_vm_snapshot get_vm_snapshot_config "
         "rollback_container_snapshot rollback_vm_snapshot "
     ),
-    "node storage volume": (
-        "copy_storage_volume delete_storage_volume get_storage_volume_info "
-    ),
+    "node storage volume": ("copy_storage_volume delete_storage_volume get_storage_volume_info "),
 }
 PATH_KEYS: dict[str, frozenset[str]] = {
-    tool: frozenset(keys.split()) for keys, tools in _PATH_KEY_GROUPS.items() for tool in tools.split()
+    tool: frozenset(keys.split())
+    for keys, tools in _PATH_KEY_GROUPS.items()
+    for tool in tools.split()
 }
 
 # Patterns for values interpolated into Proxmox API paths. ASCII only (Python's [A-Za-z0-9]
@@ -461,7 +435,9 @@ INT_PARAM_RANGES: dict[str, tuple[int, int]] = {
 }
 # (tool, key) pairs where the key is a body value of a different shape, not a path segment.
 PATH_PARAM_EXEMPT: dict[tuple[str, str], re.Pattern[str]] = {
-    ("update_pool", "storage"): re.compile(r"[A-Za-z][A-Za-z0-9._-]{0,63}(?:,[A-Za-z][A-Za-z0-9._-]{0,63})*"),
+    ("update_pool", "storage"): re.compile(
+        r"[A-Za-z][A-Za-z0-9._-]{0,63}(?:,[A-Za-z][A-Za-z0-9._-]{0,63})*"
+    ),
 }
 
 
@@ -574,7 +550,12 @@ def _check_value_shapes(tool_name: str, args: dict[str, Any]) -> None:
         if pattern is None:
             continue
         for item in value if isinstance(value, list) else [value]:
-            if not isinstance(item, str) or not item.isascii() or ".." in item or not pattern.fullmatch(item):
+            if (
+                not isinstance(item, str)
+                or not item.isascii()
+                or ".." in item
+                or not pattern.fullmatch(item)
+            ):
                 raise _bad_param(key, item)
     options = args.get("options") if tool_name == "import_vm_disk" else None
     if isinstance(options, str):
@@ -586,10 +567,18 @@ def _check_value_shapes(tool_name: str, args: dict[str, Any]) -> None:
 # --------------------------------------------------------------------------- guest config
 
 # Tools whose arguments (and create_vm's extra_config) become guest config keys.
-GUEST_CONFIG_TOOLS = frozenset({
-    "create_vm", "set_vm_config", "create_container", "set_container_config", "clone_vm",
-    "clone_container", "restore_vm_backup", "restore_container_backup",
-})
+GUEST_CONFIG_TOOLS = frozenset(
+    {
+        "create_vm",
+        "set_vm_config",
+        "create_container",
+        "set_container_config",
+        "clone_vm",
+        "clone_container",
+        "restore_vm_backup",
+        "restore_container_backup",
+    }
+)
 # Config keys that give a guest (or whoever controls its config) reach into the HOST: a
 # hook script run as root, raw QEMU arguments, host PCI/USB/serial/parallel devices, host
 # directory shares, host memory, host RNG, CPU pinning, LXC raw keys and device nodes, and
@@ -611,7 +600,9 @@ def _spec_names_host_path(spec: str) -> bool:
         target = val if eq else (part if i == 0 else None)
         if eq and key.strip().lower() not in _SOURCE_OPTIONS:
             continue
-        if target is not None and (target.strip().startswith("/") or target.strip().lower() == "cdrom"):
+        if target is not None and (
+            target.strip().startswith("/") or target.strip().lower() == "cdrom"
+        ):
             return True
     return False
 
@@ -629,14 +620,22 @@ def _check_guest_config(tool_name: str, args: dict[str, Any]) -> None:
         for key, value in _guest_config_items(args):
             lowered = key.lower()
             if HOST_ACCESS_KEY_RE.fullmatch(lowered):
-                raise RouterError(f"{key} is not accepted through MCP (host access or guest secret)")
+                raise RouterError(
+                    f"{key} is not accepted through MCP (host access or guest secret)"
+                )
             if _SERIAL_KEY_RE.fullmatch(lowered) and value != "socket":
                 raise RouterError(f"{key}: only 'socket' is accepted (no host serial devices)")
-            if _DISK_KEY_RE.fullmatch(lowered) and isinstance(value, str) and _spec_names_host_path(value):
+            if (
+                _DISK_KEY_RE.fullmatch(lowered)
+                and isinstance(value, str)
+                and _spec_names_host_path(value)
+            ):
                 raise RouterError(f"{key}: host paths and host drives are not accepted through MCP")
             if lowered == "unprivileged" and value in (False, 0, "0"):
                 raise RouterError("privileged containers are not accepted through MCP")
-            if lowered == "features" and not (isinstance(value, str) and _LXC_FEATURES_RE.fullmatch(value)):
+            if lowered == "features" and not (
+                isinstance(value, str) and _LXC_FEATURES_RE.fullmatch(value)
+            ):
                 raise RouterError("features: only nesting, keyctl and fuse are accepted")
     # Unencrypted migration sends guest memory (PHI) in clear text over the network
     # (HIPAA 164.312(e)(1)).
@@ -667,6 +666,10 @@ def _check_refused(tool_name: str, args: dict[str, Any]) -> None:
         raise RouterError(f"{hit[0]} is not accepted through MCP")
 
 
+# Tools whose upstream contract accepts arbitrary config keys at the top level.
+FREEFORM_TOOLS = frozenset({"set_vm_config"})
+
+
 def validate_arguments(tool_name: str, arguments: Any) -> None:
     """Check arguments against the tool's inputSchema and the H2 argument rules. Raises
     RouterError (a ValueError) with "Unknown tool: X" or "Invalid input for tool X: ...".
@@ -684,7 +687,13 @@ def validate_arguments(tool_name: str, arguments: Any) -> None:
         arguments = {}
     try:
         _structure_guard(arguments)
-        _check(arguments, entry[0]["inputSchema"], "arguments")
+        schema = entry[0]["inputSchema"]
+        if tool_name in FREEFORM_TOOLS:
+            # Upstream promises "any Proxmox VM config key". Undeclared keys pass only as
+            # plain names with scalar values, and _check_guest_config below still refuses
+            # every host-access key (hookscript, args, hostpci, usb, host paths, ...).
+            schema = {**schema, "additionalProperties": True}
+        _check(arguments, schema, "arguments")
         _check_path_params(tool_name, arguments)
         _check_value_shapes(tool_name, arguments)
         _check_refused(tool_name, arguments)
@@ -767,8 +776,11 @@ def meta_tools() -> list[Tool]:
             ),
             inputSchema=_META_SCHEMAS["list_tools"],
             annotations=ToolAnnotations(
-                title="Search Proxmox tools", readOnlyHint=True, idempotentHint=True,
-                destructiveHint=False, openWorldHint=False,
+                title="Search Proxmox tools",
+                readOnlyHint=True,
+                idempotentHint=True,
+                destructiveHint=False,
+                openWorldHint=False,
             ),
         ),
         Tool(
@@ -778,8 +790,11 @@ def meta_tools() -> list[Tool]:
             ),
             inputSchema=_META_SCHEMAS["describe_tool_input"],
             annotations=ToolAnnotations(
-                title="Describe Proxmox tool input", readOnlyHint=True, idempotentHint=True,
-                destructiveHint=False, openWorldHint=False,
+                title="Describe Proxmox tool input",
+                readOnlyHint=True,
+                idempotentHint=True,
+                destructiveHint=False,
+                openWorldHint=False,
             ),
         ),
         Tool(
@@ -790,8 +805,11 @@ def meta_tools() -> list[Tool]:
             ),
             inputSchema=_META_SCHEMAS["execute_tool"],
             annotations=ToolAnnotations(
-                title="Run a Proxmox tool", readOnlyHint=False, idempotentHint=False,
-                destructiveHint=True, openWorldHint=True,
+                title="Run a Proxmox tool",
+                readOnlyHint=False,
+                idempotentHint=False,
+                destructiveHint=True,
+                openWorldHint=True,
             ),
         ),
     ]
@@ -819,7 +837,9 @@ def _list_tools(identity: Identity, args: dict[str, Any]) -> str:
         for mod in MODULES:
             mine = [d["name"] for d in mod.TOOLS if d["name"] in names]
             if mine:
-                categories.append({"category": _category(mod), "tools": len(mine), "examples": mine[:4]})
+                categories.append(
+                    {"category": _category(mod), "tools": len(mine), "examples": mine[:4]}
+                )
         return json.dumps(
             {
                 "note": "Call list_tools again with 1 to 3 search_terms to get tool names.",

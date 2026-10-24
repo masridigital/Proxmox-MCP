@@ -62,7 +62,9 @@ def credentials_dir() -> str:
             if not os.path.isabs(directory):
                 raise CredentialError(f"{var} must be an absolute path")
             return directory
-    raise CredentialError("no credential directory (BROKER_CREDENTIALS_DIR / CREDENTIALS_DIRECTORY)")
+    raise CredentialError(
+        "no credential directory (BROKER_CREDENTIALS_DIR / CREDENTIALS_DIRECTORY)"
+    )
 
 
 def _check_name(name: object) -> str:
@@ -85,7 +87,10 @@ def credential_path(name: str) -> str:
 
 
 def _check_stat(name: str, st: os.stat_result) -> None:
-    if stat.S_ISLNK(st.st_mode) or getattr(st, "st_file_attributes", 0) & _FILE_ATTRIBUTE_REPARSE_POINT:
+    if (
+        stat.S_ISLNK(st.st_mode)
+        or getattr(st, "st_file_attributes", 0) & _FILE_ATTRIBUTE_REPARSE_POINT
+    ):
         raise CredentialError(f"credential {name!r} is a link")
     if not stat.S_ISREG(st.st_mode):
         raise CredentialError(f"credential {name!r} is not a regular file")

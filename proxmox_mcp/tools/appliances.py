@@ -40,8 +40,12 @@ TOOLS = [
                 "vmid": OPT_INT("VM ID (omit to use the next free one)"),
                 "name": OPT_STR("VM name (default fortigate)"),
                 "image": OPT_STR("Existing import volume, e.g. local:import/fortios.qcow2"),
-                "image_url": OPT_STR("URL of the FortiGate .qcow2 to download first (instead of image)"),
-                "image_storage": OPT_STR("Storage to download image_url into (default local; needs the import content type)"),
+                "image_url": OPT_STR(
+                    "URL of the FortiGate .qcow2 to download first (instead of image)"
+                ),
+                "image_storage": OPT_STR(
+                    "Storage to download image_url into (default local; needs the import content type)"
+                ),
                 "disk_storage": OPT_STR("Storage for the VM disks (default local-lvm)"),
                 "wan_bridge": OPT_STR("Bridge for port1 / WAN (default vmbr0)"),
                 "wan_vlan": OPT_INT("VLAN tag for port1"),
@@ -54,7 +58,9 @@ TOOLS = [
                 },
                 "cores": OPT_INT("vCPUs (default 1; the evaluation license allows 1)"),
                 "memory": OPT_INT("RAM in MB (default 2048; the evaluation license allows 2048)"),
-                "log_disk_gb": OPT_INT("Add a second disk of this size for FortiGate logs (optional)"),
+                "log_disk_gb": OPT_INT(
+                    "Add a second disk of this size for FortiGate logs (optional)"
+                ),
                 "start": OPT_BOOL("Start the VM when done (default true)"),
                 "onboot": OPT_BOOL("Start with the host (default false)"),
                 "tags": OPT_STR("Tags (default fortigate)"),
@@ -76,24 +82,38 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "node": NODE,
-                "names": {"type": "array", "items": {"type": "string"},
-                          "description": "One VM name per VM, e.g. ['k3s-test-1', 'k3s-test-2', 'k3s-test-3']"},
-                "image": OPT_STR("Cloud image import volume, e.g. local:import/noble-server-cloudimg-amd64.qcow2"),
-                "ip_addresses": {"type": "array", "items": {"type": "string"},
-                                 "description": "Static address per VM in CIDR form, e.g. ['10.0.0.21/24', ...], "
-                                                "in the same order as names. Omit for DHCP."},
+                "names": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "One VM name per VM, e.g. ['k3s-test-1', 'k3s-test-2', 'k3s-test-3']",
+                },
+                "image": OPT_STR(
+                    "Cloud image import volume, e.g. local:import/noble-server-cloudimg-amd64.qcow2"
+                ),
+                "ip_addresses": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Static address per VM in CIDR form, e.g. ['10.0.0.21/24', ...], "
+                    "in the same order as names. Omit for DHCP.",
+                },
                 "gateway": OPT_STR("Default gateway for the static addresses"),
                 "nameserver": OPT_STR("DNS server(s), space-separated (default: the node's)"),
                 "searchdomain": OPT_STR("DNS search domain"),
-                "ssh_public_keys": OPT_STR("Public key(s) for the cloud-init user, one per line (required)"),
+                "ssh_public_keys": OPT_STR(
+                    "Public key(s) for the cloud-init user, one per line (required)"
+                ),
                 "ciuser": OPT_STR("Cloud-init user (default ubuntu)"),
                 "bridge": OPT_STR("Bridge for net0 (default vmbr0)"),
                 "vlan": OPT_INT("VLAN tag for net0"),
-                "first_vmid": OPT_INT("VMID for the first VM; the rest count up from it (default: next free)"),
+                "first_vmid": OPT_INT(
+                    "VMID for the first VM; the rest count up from it (default: next free)"
+                ),
                 "cores": OPT_INT("vCPUs per VM (default 2)"),
                 "memory": OPT_INT("RAM per VM in MB (default 2048)"),
                 "disk_gb": OPT_INT("Grow the boot disk to this size in GB (default 20)"),
-                "disk_storage": OPT_STR("Storage for disks and the cloud-init drive (default local-lvm)"),
+                "disk_storage": OPT_STR(
+                    "Storage for disks and the cloud-init drive (default local-lvm)"
+                ),
                 "start": OPT_BOOL("Start the VMs (default true)"),
                 "onboot": OPT_BOOL("Start with the host (default false)"),
                 "tags": OPT_STR("Tags, ';'-separated (default cloud)"),
@@ -105,7 +125,9 @@ TOOLS = [
 ]
 
 
-async def wait_task(client: ProxmoxClient, node: str, upid: str, timeout: float = 600, poll: float = 2) -> dict[str, Any]:
+async def wait_task(
+    client: ProxmoxClient, node: str, upid: str, timeout: float = 600, poll: float = 2
+) -> dict[str, Any]:
     """Poll a task until it stops; raise if it fails or times out."""
     loop = asyncio.get_running_loop()
     deadline = loop.time() + timeout
@@ -130,7 +152,9 @@ def _nic(bridge: str, vlan: Any = None) -> str:
 def _filename(url: str) -> str:
     name = os.path.basename(urlparse(url).path) or "fortios.qcow2"
     if not re.search(r"\.(qcow2|raw|vmdk|img)$", name):
-        raise ValueError(f"image_url must point at a disk image (.qcow2/.raw/.vmdk/.img), not {name!r}")
+        raise ValueError(
+            f"image_url must point at a disk image (.qcow2/.raw/.vmdk/.img), not {name!r}"
+        )
     return name
 
 
@@ -162,15 +186,21 @@ async def handle(name: str, args: dict[str, Any], client: ProxmoxClient) -> Any:
             "extra resources only help with a paid license."
         )
     if len(nics) > EVAL_MAX_INTERFACES:
-        warnings.append(f"The free evaluation license allows at most {EVAL_MAX_INTERFACES} configured interfaces.")
+        warnings.append(
+            f"The free evaluation license allows at most {EVAL_MAX_INTERFACES} configured interfaces."
+        )
 
     steps = []
     image = args.get("image")
     if args.get("image_url"):
         storage = args.get("image_storage", "local")
         filename = _filename(args["image_url"])
-        upid = (await client.post(f"/nodes/{node}/storage/{storage}/download-url",
-                                  {"url": args["image_url"], "content": "import", "filename": filename})).get("data")
+        upid = (
+            await client.post(
+                f"/nodes/{node}/storage/{storage}/download-url",
+                {"url": args["image_url"], "content": "import", "filename": filename},
+            )
+        ).get("data")
         await wait_task(client, node, upid, timeout=1800)
         image = f"{storage}:import/{filename}"
         steps.append(f"downloaded {image}")
@@ -214,8 +244,15 @@ async def handle(name: str, args: dict[str, Any], client: ProxmoxClient) -> Any:
         mac = re.search(r"=((?:[0-9A-F]{2}:){5}[0-9A-F]{2})", net, re.I)
         tag = re.search(r"tag=(\d+)", net)
         bridge = re.search(r"bridge=([^,]+)", net)
-        ports.append({"port": f"port{i + 1}", "nic": f"net{i}", "mac": mac.group(1).lower() if mac else None,
-                      "bridge": bridge.group(1) if bridge else None, "vlan": int(tag.group(1)) if tag else None})
+        ports.append(
+            {
+                "port": f"port{i + 1}",
+                "nic": f"net{i}",
+                "mac": mac.group(1).lower() if mac else None,
+                "bridge": bridge.group(1) if bridge else None,
+                "vlan": int(tag.group(1)) if tag else None,
+            }
+        )
 
     out: dict[str, Any] = {
         "vmid": vmid,
@@ -317,25 +354,42 @@ async def deploy_cloud_vms(args: dict[str, Any], client: ProxmoxClient) -> dict[
             if args.get(key):
                 config[key] = args[key]
 
-        await _maybe_wait(client, node, await client.post(f"/nodes/{node}/qemu", config), timeout=900)
-        await _maybe_wait(client, node, await client.put(f"/nodes/{node}/qemu/{vmid}/resize",
-                                                         {"disk": "scsi0", "size": f"{disk_gb}G"}), timeout=300)
+        await _maybe_wait(
+            client, node, await client.post(f"/nodes/{node}/qemu", config), timeout=900
+        )
+        await _maybe_wait(
+            client,
+            node,
+            await client.put(
+                f"/nodes/{node}/qemu/{vmid}/resize", {"disk": "scsi0", "size": f"{disk_gb}G"}
+            ),
+            timeout=300,
+        )
         steps = [f"created from {args['image']}", f"disk grown to {disk_gb}G"]
         if args.get("start", True):
-            await _maybe_wait(client, node, await client.post(f"/nodes/{node}/qemu/{vmid}/status/start"), timeout=120)
+            await _maybe_wait(
+                client,
+                node,
+                await client.post(f"/nodes/{node}/qemu/{vmid}/status/start"),
+                timeout=120,
+            )
             steps.append("started")
 
         cfg = (await client.get(f"/nodes/{node}/qemu/{vmid}/config")).get("data") or {}
-        vms.append({
-            "vmid": vmid,
-            "name": vm_name,
-            "ip": str(ipaddress.ip_interface(ips[i]).ip) if ips else None,
-            "mac": _mac(cfg.get("net0", "")),
-            "steps": steps,
-        })
+        vms.append(
+            {
+                "vmid": vmid,
+                "name": vm_name,
+                "ip": str(ipaddress.ip_interface(ips[i]).ip) if ips else None,
+                "mac": _mac(cfg.get("net0", "")),
+                "steps": steps,
+            }
+        )
 
     out: dict[str, Any] = {"node": node, "network": nic.removeprefix("virtio,"), "vms": vms}
     if not ips:
-        out["note"] = ("DHCP: the addresses aren't known yet. Read them from your DHCP server by MAC, or with "
-                       "vm_agent_get_network_interfaces once a guest agent runs in the VMs.")
+        out["note"] = (
+            "DHCP: the addresses aren't known yet. Read them from your DHCP server by MAC, or with "
+            "vm_agent_get_network_interfaces once a guest agent runs in the VMs."
+        )
     return out

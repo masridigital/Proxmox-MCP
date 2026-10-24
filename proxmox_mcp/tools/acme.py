@@ -208,7 +208,7 @@ async def handle(name: str, args: dict[str, Any], client: ProxmoxClient) -> Any:
         return await client.get(f"/cluster/acme/account/{args['name']}")
 
     elif name == "register_acme_account":
-        data = {k: v for k, v in args.items()}
+        data = dict(args)
         return await client.post("/cluster/acme/account", data)
 
     elif name == "deregister_acme_account":
@@ -222,7 +222,7 @@ async def handle(name: str, args: dict[str, Any], client: ProxmoxClient) -> Any:
         return await client.get(f"/cluster/acme/plugins/{args['id']}")
 
     elif name == "create_acme_plugin":
-        data = {k: v for k, v in args.items()}
+        data = dict(args)
         return await client.post("/cluster/acme/plugins", data)
 
     elif name == "update_acme_plugin":
@@ -240,7 +240,9 @@ async def handle(name: str, args: dict[str, Any], client: ProxmoxClient) -> Any:
         data = {}
         if "force" in args:
             data["force"] = args["force"]
-        return await client.post(f"/nodes/{args['node']}/certificates/acme/certificate", data or None)
+        return await client.post(
+            f"/nodes/{args['node']}/certificates/acme/certificate", data or None
+        )
 
     elif name == "revoke_node_acme_cert":
         return await client.delete(f"/nodes/{args['node']}/certificates/acme/certificate")

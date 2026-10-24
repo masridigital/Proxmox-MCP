@@ -122,7 +122,15 @@ _PARAM_NAME_RE = re.compile(r"[A-Za-z][A-Za-z0-9_-]{0,63}")
 # Free-text fields where Proxmox accepts (and escapes) line breaks. Everywhere
 # else CR/LF in a value is refused: Proxmox config files are line-oriented.
 _MULTILINE_PARAMS = frozenset(
-    {"description", "comment", "notes-template", "body", "ssh-public-keys", "certificates", "input-data"}
+    {
+        "description",
+        "comment",
+        "notes-template",
+        "body",
+        "ssh-public-keys",
+        "certificates",
+        "input-data",
+    }
 )
 _CTRL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 _CRLF_RE = re.compile(r"[\r\n]")
@@ -143,7 +151,9 @@ def parse_fingerprints(value: str) -> tuple[bytes, ...]:
         if not hex_:
             continue
         if not _HEX64.fullmatch(hex_):
-            raise ValueError("PROXMOX_TLS_FINGERPRINT must be SHA-256 hex (64 digits, colons optional)")
+            raise ValueError(
+                "PROXMOX_TLS_FINGERPRINT must be SHA-256 hex (64 digits, colons optional)"
+            )
         pins.append(bytes.fromhex(hex_))
     return tuple(pins)
 
@@ -203,7 +213,9 @@ def build_ssl_context(ca_bundle: str, pins: tuple[bytes, ...], insecure: bool) -
 def validate_config() -> None:
     """Raise ValueError on unusable configuration (host, port, TLS settings)."""
     base_url(PROXMOX_HOST, PROXMOX_PORT)
-    build_ssl_context(PROXMOX_CA_BUNDLE, parse_fingerprints(PROXMOX_TLS_FINGERPRINT), PROXMOX_INSECURE_TLS)
+    build_ssl_context(
+        PROXMOX_CA_BUNDLE, parse_fingerprints(PROXMOX_TLS_FINGERPRINT), PROXMOX_INSECURE_TLS
+    )
     if MCP_LOCAL_MODE not in outbound.MODES:
         raise ValueError("MCP_LOCAL_MODE must be ro, operator or rw")
 
@@ -299,7 +311,9 @@ class GuardedTransport(httpx.AsyncHTTPTransport):
 
     def __init__(self, ssl_context: ssl.SSLContext, pins: tuple[bytes, ...]) -> None:
         limits = httpx.Limits(max_connections=20, max_keepalive_connections=10, keepalive_expiry=30)
-        super().__init__(verify=ssl_context, trust_env=False, http1=True, http2=False, limits=limits)
+        super().__init__(
+            verify=ssl_context, trust_env=False, http1=True, http2=False, limits=limits
+        )
         # httpx does not expose network_backend; rebuild its pool with ours. Fail
         # closed if a future httpx stops using this attribute.
         if not isinstance(getattr(self, "_pool", None), httpcore.AsyncConnectionPool):
@@ -394,7 +408,9 @@ def encode_params(data: Any) -> list[tuple[str, str]]:
 
 
 def _scrub_token(text: str) -> str:
-    return _TOKEN_TEXT_RE.sub(lambda m: f"{m.group(1)}=<redacted>" if m.group(1) else "<redacted>", text)
+    return _TOKEN_TEXT_RE.sub(
+        lambda m: f"{m.group(1)}=<redacted>" if m.group(1) else "<redacted>", text
+    )
 
 
 def _scrub(text: str) -> str:
@@ -404,10 +420,15 @@ def _scrub(text: str) -> str:
 
 def _bare_request(method: str, path: str) -> httpx.Request:
     """A stand-in request for exceptions: no headers, no query, no body."""
-    return httpx.Request(method if method in outbound.METHODS else "GET", f"{base_url(PROXMOX_HOST, PROXMOX_PORT)}{path}")
+    return httpx.Request(
+        method if method in outbound.METHODS else "GET",
+        f"{base_url(PROXMOX_HOST, PROXMOX_PORT)}{path}",
+    )
 
 
-def _api_error(status: int, content_type: str, body: bytes, method: str, path: str) -> httpx.HTTPStatusError:
+def _api_error(
+    status: int, content_type: str, body: bytes, method: str, path: str
+) -> httpx.HTTPStatusError:
     """An HTTPStatusError that keeps the reason Proxmox gives in the response body."""
     detail = ""
     try:
@@ -452,7 +473,9 @@ def _sanitize(exc: Exception, method: str, path: str) -> Exception:
             return httpx.TransportError(type(exc).__name__, request=_bare_request(method, path))
     if isinstance(exc, _ResponseRefused):
         return ValueError(str(exc))
-    return httpx.TransportError(f"Proxmox request failed ({type(exc).__name__})", request=_bare_request(method, path))
+    return httpx.TransportError(
+        f"Proxmox request failed ({type(exc).__name__})", request=_bare_request(method, path)
+    )
 
 
 async def _aiter(chunks: Any) -> Any:
@@ -487,8 +510,7 @@ class ProxmoxClient:
                 " (fingerprint pin still enforced)" if pins else "",
             )
         self.tls_mode = (
-            "insecure" if PROXMOX_INSECURE_TLS and not pins
-            else "pinned" if pins else "ca"
+            "insecure" if PROXMOX_INSECURE_TLS and not pins else "pinned" if pins else "ca"
         )
         try:
             timeout = float(PROXMOX_TIMEOUT)
@@ -536,7 +558,9 @@ class ProxmoxClient:
         else:
             token = cached[1]
         if token.userid != expected_userid:
-            raise CredentialError("API token belongs to a different Proxmox user than the enrollment")
+            raise CredentialError(
+                "API token belongs to a different Proxmox user than the enrollment"
+            )
         return token
 
     @staticmethod
@@ -633,7 +657,9 @@ class ProxmoxClient:
         try:
             status, content_type, body = await self._exchange(method, path, pairs, box, meter)
         except Exception as exc:
-            audit.audit_event(**record, status="error", error=type(exc).__name__, bytes=meter[0], ms=_ms(started))
+            audit.audit_event(
+                **record, status="error", error=type(exc).__name__, bytes=meter[0], ms=_ms(started)
+            )
             raise
         audit.audit_event(**record, status=status, bytes=meter[0], ms=_ms(started))
         if status >= 300 or status < 200:
@@ -670,7 +696,9 @@ class ProxmoxClient:
             req = self.client.build_request(method, url, headers=headers, params=pairs or None)
         elif pairs:
             headers["Content-Type"] = "application/x-www-form-urlencoded"
-            req = self.client.build_request(method, url, headers=headers, content=urlencode(pairs).encode("ascii"))
+            req = self.client.build_request(
+                method, url, headers=headers, content=urlencode(pairs).encode("ascii")
+            )
         else:
             req = self.client.build_request(method, url, headers=headers)
         del headers
@@ -684,17 +712,25 @@ class ProxmoxClient:
                     content_type = response.headers.get("Content-Type", "")
                     encoding = response.headers.get("Content-Encoding", "").strip().lower()
                     if encoding not in ("", "identity"):
-                        raise _ResponseRefused("Proxmox response has an unsupported Content-Encoding")
+                        raise _ResponseRefused(
+                            "Proxmox response has an unsupported Content-Encoding"
+                        )
                     declared = response.headers.get("Content-Length", "")
                     if declared.isdigit() and int(declared) > self.max_response_bytes:
-                        raise _ResponseRefused("Proxmox response exceeds PROXMOX_MAX_RESPONSE_BYTES")
+                        raise _ResponseRefused(
+                            "Proxmox response exceeds PROXMOX_MAX_RESPONSE_BYTES"
+                        )
                     # The network transport always streams; a transport that hands back an
                     # already-read body (httpx.MockTransport) is measured the same way.
-                    raw = [response.content] if response.is_stream_consumed else response.aiter_raw()
+                    raw = (
+                        [response.content] if response.is_stream_consumed else response.aiter_raw()
+                    )
                     async for chunk in _aiter(raw):
                         meter[0] += len(chunk)
                         if meter[0] > self.max_response_bytes:
-                            raise _ResponseRefused("Proxmox response exceeds PROXMOX_MAX_RESPONSE_BYTES")
+                            raise _ResponseRefused(
+                                "Proxmox response exceeds PROXMOX_MAX_RESPONSE_BYTES"
+                            )
                         chunks.append(chunk)
                 finally:
                     await response.aclose()

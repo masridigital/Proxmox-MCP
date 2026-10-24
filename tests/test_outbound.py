@@ -69,7 +69,11 @@ def test_rw_delete_and_typed_placeholders():
     outbound.check("DELETE", "/nodes/pve/qemu/100", "rw")
     with pytest.raises(PermissionError, match="allowlist"):
         outbound.check("DELETE", "/nodes/pve/qemu/abc", "rw")  # vmid must be digits
-    outbound.check("GET", "/nodes/pve/tasks/UPID:pve:0000ABCD:0123ABCD:65A1B2C3:qmstart:100:root@pam:/status", "ro")
+    outbound.check(
+        "GET",
+        "/nodes/pve/tasks/UPID:pve:0000ABCD:0123ABCD:65A1B2C3:qmstart:100:root@pam:/status",
+        "ro",
+    )
     outbound.check("GET", "/nodes/pve/storage/local/content/local%3Aiso%2Fubuntu.iso", "ro")
     outbound.check("DELETE", "/cluster/firewall/ipset/blk/10.0.0.0%2F24", "rw")
 
@@ -182,8 +186,11 @@ async def test_every_tool_path_is_allowlisted_or_denied():
         props = tool_def["inputSchema"].get("properties", {})
         for args in (
             {k: _value(k, v, i) for i, (k, v) in enumerate(props.items())},
-            {k: _value(k, v, i) for i, (k, v) in enumerate(props.items())
-             if k in tool_def["inputSchema"].get("required", [])},
+            {
+                k: _value(k, v, i)
+                for i, (k, v) in enumerate(props.items())
+                if k in tool_def["inputSchema"].get("required", [])
+            },
         ):
             rec = _Recorder()
             try:

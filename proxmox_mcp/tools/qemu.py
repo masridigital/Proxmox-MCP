@@ -209,7 +209,9 @@ TOOLS = [
                     "local-lvm:0,import-from=local:import/disk.qcow2"
                 ),
                 "scsi1": OPT_STR("SCSI disk 1 (e.g. local-lvm:8)"),
-                "ide2": OPT_STR("IDE device 2 (e.g. local:iso/ubuntu.iso,media=cdrom, or local-lvm:cloudinit)"),
+                "ide2": OPT_STR(
+                    "IDE device 2 (e.g. local:iso/ubuntu.iso,media=cdrom, or local-lvm:cloudinit)"
+                ),
                 "net0": OPT_STR("Network interface 0 (e.g. virtio,bridge=vmbr0,tag=150)"),
                 "net1": OPT_STR("Network interface 1"),
                 "net2": OPT_STR("Network interface 2"),
@@ -228,7 +230,7 @@ TOOLS = [
                     "type": "object",
                     "description": (
                         "Any other VM config keys passed to the API as-is, e.g. "
-                        "{\"net4\": \"virtio,bridge=vmbr1\", \"ciuser\": \"ubuntu\", \"ipconfig0\": \"ip=dhcp\"}"
+                        '{"net4": "virtio,bridge=vmbr1", "ciuser": "ubuntu", "ipconfig0": "ip=dhcp"}'
                     ),
                     "additionalProperties": True,
                 },
@@ -265,7 +267,9 @@ TOOLS = [
             "properties": {
                 "node": NODE,
                 "vmid": VMID,
-                "destroy-unreferenced-disks": OPT_BOOL("Also destroy disks not referenced in config"),
+                "destroy-unreferenced-disks": OPT_BOOL(
+                    "Also destroy disks not referenced in config"
+                ),
                 "purge": OPT_BOOL("Remove from HA, replication, jobs, and backup configs"),
                 "skiplock": OPT_BOOL("Skip lock check"),
             },
@@ -448,7 +452,9 @@ TOOLS = [
             "properties": {
                 "node": NODE,
                 "vmid": VMID,
-                "source": OPT_STR("Volume ID (local:import/disk.qcow2) or absolute path on the node"),
+                "source": OPT_STR(
+                    "Volume ID (local:import/disk.qcow2) or absolute path on the node"
+                ),
                 "storage": OPT_STR("Target storage ID for the new disk, e.g. local-lvm"),
                 "disk": OPT_STR("Disk slot to attach it as (default scsi0)"),
                 "format": OPT_STR("Target format on file storages: raw, qcow2, vmdk"),
@@ -526,7 +532,9 @@ TOOLS = [
                 "ndp": OPT_INT("Allow NDP (IPv6): 1 or 0"),
                 "radv": OPT_INT("Allow router advertisements: 1 or 0"),
                 "ipfilter": OPT_INT("Enable IP filtering: 1 or 0"),
-                "log_level_in": OPT_STR("Log level for inbound: emerg, alert, crit, err, warning, notice, info, debug, nolog"),
+                "log_level_in": OPT_STR(
+                    "Log level for inbound: emerg, alert, crit, err, warning, notice, info, debug, nolog"
+                ),
                 "log_level_out": OPT_STR("Log level for outbound"),
             },
             "required": ["node", "vmid"],
@@ -794,7 +802,9 @@ async def handle(name: str, args: dict[str, Any], client: ProxmoxClient) -> Any:
         return await client.post(f"{vm}/clone", data)
 
     elif name == "delete_vm":
-        params = {k: args[k] for k in ("destroy-unreferenced-disks", "purge", "skiplock") if k in args}
+        params = {
+            k: args[k] for k in ("destroy-unreferenced-disks", "purge", "skiplock") if k in args
+        }
         return await client.delete(vm, params or None)
 
     elif name == "convert_vm_to_template":

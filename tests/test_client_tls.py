@@ -86,7 +86,10 @@ async def server(cert_files):
             body = b'{"data":"ok"}'
             writer.write(
                 b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
-                b"Content-Length: " + str(len(body)).encode() + b"\r\nConnection: close\r\n\r\n" + body
+                b"Content-Length: "
+                + str(len(body)).encode()
+                + b"\r\nConnection: close\r\n\r\n"
+                + body
             )
             await writer.drain()
         writer.close()
@@ -105,7 +108,9 @@ def make_client(monkeypatch, port, *, pin="", ca="", insecure=False):
     monkeypatch.setattr(client_mod, "PROXMOX_CA_BUNDLE", ca)
     monkeypatch.setattr(client_mod, "PROXMOX_INSECURE_TLS", insecure)
     monkeypatch.setattr(client_mod, "PROXMOX_READ_ONLY", False)
-    monkeypatch.setattr(client_mod, "require_identity", lambda: Identity("alice@example.com", "user"))
+    monkeypatch.setattr(
+        client_mod, "require_identity", lambda: Identity("alice@example.com", "user")
+    )
     monkeypatch.setattr(client_mod.ProxmoxClient, "resolve_auth", lambda self, i: ("ro", TOKEN))
     monkeypatch.setattr(client_mod.audit, "audit_event", lambda **f: None)
     return client_mod.ProxmoxClient()

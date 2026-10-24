@@ -118,7 +118,9 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "node": NODE,
-                "type": OPT_STR("Filter by interface type (bridge, bond, eth, alias, vlan, OVSBridge, OVSBond, OVSPort, OVSIntPort, any_bridge, any_local_bridge)"),
+                "type": OPT_STR(
+                    "Filter by interface type (bridge, bond, eth, alias, vlan, OVSBridge, OVSBond, OVSPort, OVSIntPort, any_bridge, any_local_bridge)"
+                ),
             },
             "required": ["node"],
         },
@@ -359,7 +361,9 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "node": NODE,
-                "vms": OPT_STR("Comma-separated list of VMIDs to start (optional, defaults to all)"),
+                "vms": OPT_STR(
+                    "Comma-separated list of VMIDs to start (optional, defaults to all)"
+                ),
                 "force": OPT_STR("Force start even if HA managed (true/false)"),
             },
             "required": ["node"],
@@ -418,7 +422,9 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "node": NODE,
-                "type": OPT_STR("Scan type: zfs, lvm, lvmthin, iscsi, nfs, cifs, glusterfs, pbs, dir"),
+                "type": OPT_STR(
+                    "Scan type: zfs, lvm, lvmthin, iscsi, nfs, cifs, glusterfs, pbs, dir"
+                ),
             },
             "required": ["node", "type"],
         },
@@ -513,7 +519,11 @@ async def handle(name: str, args: dict[str, Any], client: ProxmoxClient) -> Any:
         return await client.get(f"/nodes/{node}/syslog", params or None)
 
     elif name == "get_node_journal":
-        params = {k: args[k] for k in ("limit", "startcursor", "endcursor", "since", "until", "lastentries") if k in args}
+        params = {
+            k: args[k]
+            for k in ("limit", "startcursor", "endcursor", "since", "until", "lastentries")
+            if k in args
+        }
         return await client.get(f"/nodes/{node}/journal", params or None)
 
     elif name == "get_node_report":
