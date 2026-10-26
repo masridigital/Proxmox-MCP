@@ -15,10 +15,10 @@
     "gen-vector": "node scripts/gen-assertion-vector.mjs"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "5.20261008.1",
+    "@cloudflare/workers-types": "5.20261019.1",
     "typescript": "6.0.3",
-    "vitest": "5.0.3",
-    "wrangler": "4.149.0"
+    "vitest": "5.0.5",
+    "wrangler": "4.151.1"
   },
   "overrides": {
     "undici": "7.30.1"
