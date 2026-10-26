@@ -10,4 +10,4 @@ hatchling==1.32.4
 packaging==26.3
 # Transitive (cachecontrol, via pip-audit). Floor for CVE-2026-112937 / CVE-2026-112907; the fix
 # is inside the 7-day cooldown, so compile with --exclude-newer-package filelock=2026-10-18T00:00:00Z.
-filelock>=4.2.1
+filelock>=4.2.4
